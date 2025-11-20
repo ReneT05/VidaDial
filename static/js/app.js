@@ -321,11 +321,10 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
             if ((active <= 0)
             ||  (click  <= 0)
             ||  (active == click)) {
-                $rootScope.slide = "animate__animated animate__faster animate__bounceIn"
+                $rootScope.slide = `animate__animated animate__faster animate__${((click == 0) ? "bounceIn" : "fadeIn")}`
             }
             else if (active != click) {
-                $rootScope.slide  = "animate__animated animate__faster animate__slideIn"
-                $rootScope.slide += ((active > click) ? "Left" : "Right")
+                $rootScope.slide  = `animate__animated animate__faster animate__slideIn${((active > click) ? "Left" : "Right")}`
             }
 
 
