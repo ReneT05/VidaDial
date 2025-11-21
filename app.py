@@ -60,26 +60,26 @@ def login(fun):
         return fun(*args, **kwargs)
     return decorador
 
-@app.route("/app/")
+@app.route("/")
 def landingPage():
     return render_template("landing-page.html")
 
-@app.route("/app/dashboard")
+@app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html")
 
-@app.route("/app/login")
+@app.route("/login")
 def appLogin():
     return render_template("login.html")
     # return "<h5>Hola, soy la view app</h5>"
 
-@app.route("/app/fechaHora")
+@app.route("/fechaHora")
 def fechaHora():
     tz    = pytz.timezone("America/Matamoros")
     ahora = datetime.datetime.now(tz)
     return ahora.strftime("%Y-%m-%d %H:%M:%S")
 
-@app.route("/app/iniciarSesion", methods=["POST"])
+@app.route("/iniciarSesion", methods=["POST"])
 # Usar cuando solo se quiera usar CORS en rutas específicas
 # @cross_origin()
 def iniciarSesion():
@@ -114,7 +114,7 @@ def iniciarSesion():
 
     return make_response(jsonify(registros))
 
-@app.route("/app/cerrarSesion", methods=["POST"])
+@app.route("/cerrarSesion", methods=["POST"])
 @login
 def cerrarSesion():
     session["login"]      = False
@@ -122,7 +122,7 @@ def cerrarSesion():
     session["login-tipo"] = 0
     return make_response(jsonify({}))
 
-@app.route("/app/preferencias")
+@app.route("/preferencias")
 @login
 def preferencias():
     return make_response(jsonify({
@@ -130,7 +130,7 @@ def preferencias():
         "tipo": session.get("login-tipo", 2)
     }))
 
-@app.route("/app/log", methods=["GET"])
+@app.route("/log", methods=["GET"])
 def logProductos():
     args         = request.args
     actividad    = args["actividad"]
@@ -147,15 +147,15 @@ def logProductos():
 
     return log
 
-@app.route("/app/productos")
+@app.route("/productos")
 def productos():
     return render_template("productos.html")
 
-@app.route("/app/ventas")
+@app.route("/ventas")
 def ventas():
     return render_template("ventas.html")
 
-@app.route("/app/productos/buscar", methods=["GET"])
+@app.route("/productos/buscar", methods=["GET"])
 @login
 def buscarProductos():
     args     = request.args
@@ -193,7 +193,7 @@ def buscarProductos():
 
     return make_response(jsonify(registros))
 
-@app.route("/app/productos/categoria", methods=["GET"])
+@app.route("/productos/categoria", methods=["GET"])
 @login
 def productosCategorias():
     args      = request.args
@@ -225,7 +225,7 @@ def productosCategorias():
 
     return make_response(jsonify(registros))
 
-@app.route("/app/productos/ingredientes/<int:id>")
+@app.route("/productos/ingredientes/<int:id>")
 @login
 def productosIngredientes(id):
     con    = con_pool.get_connection()
@@ -248,7 +248,7 @@ def productosIngredientes(id):
 
     return make_response(jsonify(registros))
 
-@app.route("/app/producto", methods=["POST"])
+@app.route("/producto", methods=["POST"])
 @login
 def guardarProducto():
     id     = request.form["id"]
@@ -291,7 +291,7 @@ def guardarProducto():
 
     return make_response(jsonify({}))
 
-@app.route("/app/producto/<int:id>")
+@app.route("/producto/<int:id>")
 @login
 def editarProducto(id):
     con    = con_pool.get_connection()
@@ -312,7 +312,7 @@ def editarProducto(id):
 
     return make_response(jsonify(registros))
 
-@app.route("/app/producto/eliminar", methods=["POST"])
+@app.route("/producto/eliminar", methods=["POST"])
 def eliminarProducto():
     id = request.form["id"]
 
@@ -335,7 +335,7 @@ def eliminarProducto():
 
     return make_response(jsonify({}))
 
-@app.route("/app/ventas/buscar", methods=["GET"])
+@app.route("/ventas/buscar", methods=["GET"])
 @login
 def buscarVentas():
     args     = request.args
@@ -371,7 +371,7 @@ def buscarVentas():
 
     return make_response(jsonify(registros))
 
-@app.route("/app/venta/eliminar", methods=["POST"])
+@app.route("/venta/eliminar", methods=["POST"])
 def eliminarVenta():
     id = request.form["id"]
 
