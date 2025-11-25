@@ -61,10 +61,6 @@ def login(fun):
     return decorador
 
 @app.route("/")
-def landingPage():
-    return render_template("landing-page.html")
-
-@app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html")
 
