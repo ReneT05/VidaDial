@@ -829,23 +829,23 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
             $scope.bitacora = registro.length
             $("#tbodyBitacora").html("")
             for (let x in registro) {
-                const registro = registro[x]
+                const item = registro[x]
 
                 $("#tbodyBitacora").append(`<tr>
-                    <td>${registro.idBitacora}</td>
-                    <td>${registro.fecha}</td>
-                    <td>${registro.horaInicio}</td>
-                    <td>${registro.horaFin}</td>
-                    <td>${registro.ufTotal}</td>
-                    <td>${registro.tiempoMedioPerm}</td>
-                    <td>${registro.liquidoIngerido}</td>
-                    <td>${registro.cantidadOrina}</td>                   
-                    <td>${registro.glucosa}</td>
-                    <td>${registro.presionArterial}</td>
-                    <td>${registro.fechaCreacion}</td>
-                    <td>${registro.fechaActualizacion}</td>
+                    <td>${item.idBitacora}</td>
+                    <td>${item.fecha}</td>
+                    <td>${item.horaInicio}</td>
+                    <td>${item.horaFin}</td>
+                    <td>${item.ufTotal}</td>
+                    <td>${item.tiempoMedioPerm}</td>
+                    <td>${item.liquidoIngerido}</td>
+                    <td>${item.cantidadOrina}</td>                   
+                    <td>${item.glucosa}</td>
+                    <td>${item.presionArterial}</td>
+                    <td>${item.fechaCreacion}</td>
+                    <td>${item.fechaActualizacion}</td>
                     <td>
-                        <button class="btn btn-danger btn-eliminar while-waiting" data-id="${registro.idBitacora}">Eliminar</button><br>
+                        <button class="btn btn-danger btn-eliminar while-waiting" data-id="${item.idBitacora}">Eliminar</button><br>
                     </td>
                 </tr>`)
             }
