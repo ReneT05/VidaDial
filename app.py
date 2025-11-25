@@ -342,15 +342,15 @@ def buscarBitacora():
         con    = con_pool.get_connection()
         cursor = con.cursor(dictionary=True)
         sql    = """
-        SELECT *
-        FROM bitacora
-        WHERE 
-            idBitacora LIKE %s OR
-            fecha LIKE %s OR
-            glucosa LIKE %s
-        ORDER BY idBitacora DESC;
+SELECT *
+FROM bitacora
+WHERE 
+    idBitacora LIKE %s OR
+    fecha LIKE %s OR
+    glucosa LIKE %s
+ORDER BY idBitacora DESC;
         """ 
-        val    = (busqueda, )
+        val    = (busqueda, busqueda, busqueda )
 
         cursor.execute(sql, val)
         registros = cursor.fetchall()
