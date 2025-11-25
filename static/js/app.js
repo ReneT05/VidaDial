@@ -168,9 +168,9 @@ app.config(function ($routeProvider, $locationProvider, $provide) {
         templateUrl: "productos",
         controller: "productosCtrl"
     })
-    .when("/ventas", {
-        templateUrl: "ventas",
-        controller: "ventasCtrl"
+    .when("/bitacora", {
+        templateUrl: "bitacora",
+        controller: "bitacoraCtrl"
     })
     .otherwise({
         redirectTo: "/"
@@ -813,31 +813,39 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Categori
         ])
     })
 })
-app.controller("ventasCtrl", function ($scope, $http) {
-    function buscarVentas() {
-        $("#tbodyVentas").html(`<tr>
+app.controller("bitacoraCtrl", function ($scope, $http) {
+    function buscarBitacora() {
+        $("#tbodyBitacora").html(`<tr>
             <th colspan="5" class="text-center">
                 <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
                     <span class="visually-hidden">Cargando...</span>
                 </div>
             </th>
         </tr>`)
-        $.get("ventas/buscar", {
+        $.get("bitacora/buscar", {
             busqueda: ""
-        }, function (ventas) {
+        }, function (registro) {
             enableAll()
-            $scope.totalVentas = ventas.length
-            $("#tbodyVentas").html("")
-            for (let x in ventas) {
-                const venta = ventas[x]
+            $scope.bitacora = registro.length
+            $("#tbodyBitacora").html("")
+            for (let x in registro) {
+                const registro = registro[x]
 
-                $("#tbodyVentas").append(`<tr>
-                    <td>${venta.Id_Venta}</td>
-                    <td>${venta.Nombre_Usuario}</td>
-                    <td>${venta.Fecha_Hora}</td>
-                    <td>${venta.Pago || ''}</td>
+                $("#tbodyBitacora").append(`<tr>
+                    <td>${registro.idBitacora}</td>
+                    <td>${registro.fecha}</td>
+                    <td>${registro.horaInicio}</td>
+                    <td>${registro.horaFin}</td>
+                    <td>${registro.ufTotal}</td>
+                    <td>${registro.tiempoMedioPerm}</td>
+                    <td>${registro.liquidoIngerido}</td>
+                    <td>${registro.cantidadOrina}</td>                   
+                    <td>${registro.glucosa}</td>
+                    <td>${registro.presionArterial}</td>
+                    <td>${registro.fechaCreacion}</td>
+                    <td>${registro.fechaActualizacion}</td>
                     <td>
-                        <button class="btn btn-danger btn-eliminar while-waiting" data-id="${venta.Id_Venta}">Eliminar</button><br>
+                        <button class="btn btn-danger btn-eliminar while-waiting" data-id="${registro.idBitacora}">Eliminar</button><br>
                     </td>
                 </tr>`)
             }
@@ -845,14 +853,14 @@ app.controller("ventasCtrl", function ($scope, $http) {
         disableAll()
     }
 
-    buscarVentas()
+    buscarBitacora()
 
 
-    $scope.$watch("totalVentas", function (newVal, oldVal) {
+    $scope.$watch("bitacora", function (newVal, oldVal) {
         if (newVal < oldVal) {
             $.get("log", {
-                actividad: "Eliminación de Venta.",
-                descripcion: `Se eliminó una venta "${newVal}"`
+                actividad: "Eliminación de Registro.",
+                descripcion: `Se eliminó un registro "${newVal}"`
             })
         }
     })
@@ -862,15 +870,15 @@ app.controller("ventasCtrl", function ($scope, $http) {
     $(document).on("click", ".btn-eliminar", function (event) {
         const id = $(this).data("id")
 
-        modal("Eliminar esta venta?", 'Confirmaci&oacute;n', [
+        modal("Eliminar este Registro?", 'Confirmaci&oacute;n', [
             {html: "No", class: "btn btn-secondary", dismiss: true},
             {html: "Sí", class: "btn btn-danger while-waiting", defaultButton: true, fun: function () {
-                $.post(`venta/eliminar`, {
+                $.post(`bitacora/eliminar`, {
                     id: id
                 }, function (respuesta) {
                     enableAll()
                     closeModal()
-                    buscarVentas()
+                    buscarBitacora()
                 })
                 disableAll()
             }}

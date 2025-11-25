@@ -147,9 +147,9 @@ def logProductos():
 def productos():
     return render_template("productos.html")
 
-@app.route("/ventas")
-def ventas():
-    return render_template("ventas.html")
+@app.route("/bitacora")
+def bitacora():
+    return render_template("bitacora.html")
 
 @app.route("/productos/buscar", methods=["GET"])
 @login
@@ -331,9 +331,9 @@ def eliminarProducto():
 
     return make_response(jsonify({}))
 
-@app.route("/ventas/buscar", methods=["GET"])
+@app.route("/bitacora/buscar", methods=["GET"])
 @login
-def buscarVentas():
+def buscarBitacora():
     args     = request.args
     busqueda = args["busqueda"]
     busqueda = f"%{busqueda}%"
@@ -342,14 +342,22 @@ def buscarVentas():
         con    = con_pool.get_connection()
         cursor = con.cursor(dictionary=True)
         sql    = """
-        SELECT Id_Venta,
-            Nombre_Usuario,
-            Fecha_Hora,
-            Pago
-        FROM ventas
-        INNER JOIN usuarios USING(Id_Usuario)
-        WHERE Nombre_Usuario LIKE %s
-        ORDER BY Id_Venta DESC
+       SELECT 
+            idBitacora,
+            fecha,
+            horaInicio,
+            horaFin,
+            drenajeInicial,
+            ufTotal,
+            tiempoMedioPerm,
+            liquidoIngerido,
+            cantidadOrina,
+            glucosa,
+            presionArterial,
+            fechaCreacion,
+            fechaActualizacion
+        FROM bitacora
+        ORDER BY idBitacora DESC;
         """
         val    = (busqueda, )
 
@@ -367,24 +375,16 @@ def buscarVentas():
 
     return make_response(jsonify(registros))
 
-@app.route("/venta/eliminar", methods=["POST"])
-def eliminarVenta():
+@app.route("/bitacora/eliminar", methods=["POST"])
+def eliminarRegistro():
     id = request.form["id"]
 
     con    = con_pool.get_connection()
     cursor = con.cursor(dictionary=True)
 
     sql    = """
-    DELETE FROM detalles_ventas
-    WHERE Id_Venta = %s
-    """
-    val    = (id,)
-    cursor.execute(sql, val)
-    con.commit()
-
-    sql    = """
-    DELETE FROM ventas
-    WHERE Id_Venta = %s
+    DELETE FROM bitacora
+    WHERE idBitacora = %s
     """
     val    = (id,)
     cursor.execute(sql, val)
