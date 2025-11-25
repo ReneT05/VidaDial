@@ -22,9 +22,9 @@ con_pool = mysql.connector.pooling.MySQLConnectionPool(
     pool_name="my_pool",
     pool_size=5,
     host="185.232.14.52",
-    database="u760464709_16005339_bd",
-    user="u760464709_16005339_usr",
-    password="/iJRzrJBz+P1"
+    database="u760464709_23005102_bd",
+    user="u760464709_23005102_usr",
+    password="*Q~ic:$9XVr2"
 )
 """
 con_pool = mysql.connector.pooling.MySQLConnectionPool(
@@ -85,10 +85,10 @@ def iniciarSesion():
     con    = con_pool.get_connection()
     cursor = con.cursor(dictionary=True)
     sql    = """
-    SELECT Id_Usuario, Nombre_Usuario, Tipo_Usuario
+    SELECT id, nombre, tipo_usuario
     FROM usuarios
-    WHERE Nombre_Usuario = %s
-    AND Contrasena = %s
+    WHERE nombre = %s
+    AND contrasena = %s
     """
     val    = (usuario, contrasena)
 
@@ -105,8 +105,8 @@ def iniciarSesion():
     if registros:
         usuario = registros[0]
         session["login"]      = True
-        session["login-usr"]  = usuario["Nombre_Usuario"]
-        session["login-tipo"] = usuario["Tipo_Usuario"]
+        session["login-usr"]  = usuario["nombre"]
+        session["login-tipo"] = usuario["tipo_usuario"]
 
     return make_response(jsonify(registros))
 
