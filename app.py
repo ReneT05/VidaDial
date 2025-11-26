@@ -114,7 +114,7 @@ def iniciarSesion():
     con    = con_pool.get_connection()
     cursor = con.cursor(dictionary=True)
     sql    = """
-    SELECT id, nombre, tipo_usuario
+    SELECT idUsuario, nombre, tipo_usuario
     FROM usuario
     WHERE nombre = %s
     AND contrasena = %s
@@ -137,7 +137,7 @@ def iniciarSesion():
         session["login"]      = True
         session["login-usr"]  = usuario["nombre"]
         session["login-tipo"] = usuario["tipo_usuario"]
-        session["login-id"]   = usuario["id"]
+        session["login-id"]   = usuario["idUsuario"]
 
     return make_response(jsonify(registros))
 
