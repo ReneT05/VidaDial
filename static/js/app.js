@@ -132,6 +132,175 @@ app.factory("RecetaFacade", function(ProductoAPI, RecetaAPI, $q) {
     };
 })
 
+// ============================================================================
+// PATRÓN MEDIATOR
+// ============================================================================
+
+app.factory("BitacoraMediator", function() {
+    /**
+     * Patrón Mediator para coordinar la comunicación entre componentes
+     * de bitácora sin que se conozcan directamente.
+     */
+    const components = {}
+    
+    return {
+        /**
+         * Registra un componente en el mediator
+         * @param {string} name - Nombre del componente
+         * @param {object} component - Objeto del componente con método receive
+         */
+        register: function(name, component) {
+            components[name] = component
+            console.log(`[Mediator] Componente '${name}' registrado`)
+        },
+        
+        /**
+         * Envía un mensaje a un componente específico
+         * @param {string} to - Nombre del componente destino
+         * @param {string} event - Tipo de evento
+         * @param {object} data - Datos del evento
+         */
+        send: function(to, event, data) {
+            if (components[to] && components[to].receive) {
+                console.log(`[Mediator] Enviando '${event}' a '${to}'`)
+                components[to].receive(event, data)
+            } else {
+                console.warn(`[Mediator] Componente '${to}' no encontrado o no tiene método receive`)
+            }
+        },
+        
+        /**
+         * Envía un mensaje a todos los componentes registrados
+         * @param {string} event - Tipo de evento
+         * @param {object} data - Datos del evento
+         */
+        broadcast: function(event, data) {
+            console.log(`[Mediator] Broadcast: '${event}'`)
+            for (let name in components) {
+                if (components[name].receive) {
+                    components[name].receive(event, data)
+                }
+            }
+        },
+        
+        /**
+         * Obtiene un componente registrado
+         * @param {string} name - Nombre del componente
+         * @returns {object} El componente o undefined
+         */
+        get: function(name) {
+            return components[name]
+        }
+    }
+})
+
+// Componente del formulario de bitácora
+app.factory("FormularioBitacoraComponent", function(BitacoraMediator) {
+    return {
+        receive: function(event, data) {
+            switch(event) {
+                case 'registro_guardado':
+                    this.limpiar()
+                    break
+                case 'cargar_para_editar':
+                    this.cargar(data.registro)
+                    break
+                case 'limpiar_formulario':
+                    this.limpiar()
+                    break
+            }
+        },
+        
+        limpiar: function() {
+            $("#txtIdBitacora").val("")
+            $("#frmBitacora")[0].reset()
+            $("#btnGuardar").text("Guardar Registro")
+            $("#btnGuardar").removeClass("btn-warning").addClass("btn-primary")
+        },
+        
+        cargar: function(registro) {
+            if (!registro) return
+            
+            $("#txtIdBitacora").val(registro.idBitacora)
+            $("#txtFecha").val(registro.fecha)
+            $("#txtHoraInicio").val(registro.horaInicio || "")
+            $("#txtHoraFin").val(registro.horaFin || "")
+            $("#txtDrenajeInicial").val(registro.drenajeInicial || "")
+            $("#txtUfTotal").val(registro.ufTotal || "")
+            $("#txtTiempoMedioPerm").val(registro.tiempoMedioPerm || "")
+            $("#txtLiquidoIngerido").val(registro.liquidoIngerido || "")
+            $("#txtCantidadOrina").val(registro.cantidadOrina || "")
+            $("#txtGlucosa").val(registro.glucosa || "")
+            $("#txtPresionArterial").val(registro.presionArterial || "")
+            
+            $("#btnGuardar").text("Actualizar Registro")
+            $("#btnGuardar").removeClass("btn-primary").addClass("btn-warning")
+            
+            // Scroll al formulario
+            $('html, body').animate({
+                scrollTop: $("#frmBitacora").offset().top - 100
+            }, 500)
+        },
+        
+        notificar: function(event, data) {
+            BitacoraMediator.broadcast(event, data)
+        }
+    }
+})
+
+// Componente de la lista de registros de bitácora
+app.factory("ListaBitacoraComponent", function(BitacoraMediator) {
+    return {
+        receive: function(event, data) {
+            switch(event) {
+                case 'registro_guardado':
+                case 'registro_eliminado':
+                case 'registro_actualizado':
+                    this.refrescar()
+                    break
+                case 'mes_seleccionado':
+                    // La búsqueda se maneja en el controlador
+                    break
+            }
+        },
+        
+        refrescar: function() {
+            // Notificar al controlador de bitácora para refrescar
+            if (window.buscarBitacora) {
+                window.buscarBitacora()
+            } else if (window.$scope && window.$scope.buscarBitacora) {
+                window.$scope.buscarBitacora()
+            }
+        },
+        
+        notificar: function(event, data) {
+            BitacoraMediator.broadcast(event, data)
+        }
+    }
+})
+
+// Componente de búsqueda de bitácora
+app.factory("BusquedaBitacoraComponent", function(BitacoraMediator) {
+    return {
+        receive: function(event, data) {
+            switch(event) {
+                case 'mes_seleccionado':
+                    this.buscar(data.mes)
+                    break
+            }
+        },
+        
+        buscar: function(mes) {
+            // La búsqueda se maneja en el controlador
+            // Este componente puede usarse para lógica adicional de búsqueda
+        },
+        
+        notificar: function(event, data) {
+            BitacoraMediator.broadcast(event, data)
+        }
+    }
+})
+
 app.config(function ($routeProvider, $locationProvider, $provide) {
     $provide.decorator("MensajesService", function ($delegate, $log) {
         const originalModal = $delegate.modal
@@ -660,15 +829,22 @@ app.controller("loginCtrl", function ($scope, $http, $rootScope) {
         disableAll()
     })
 })
-app.controller("productosCtrl", function ($scope, $http, SesionService, MensajesService) {
+app.controller("productosCtrl", function ($scope, $http, SesionService, MensajesService, BitacoraMediator, FormularioBitacoraComponent) {
     $scope.SesionService = SesionService
+
+    // Registrar el componente del formulario en el Mediator
+    BitacoraMediator.register('formulario', FormularioBitacoraComponent)
+    
+    // Exponer función globalmente para compatibilidad
+    window.cargarRegistroParaEditar = function(idBitacora) {
+        $.get(`bitacora/${idBitacora}`, function(registro) {
+            BitacoraMediator.send('formulario', 'cargar_para_editar', { registro: registro })
+        })
+    }
 
     // Función para limpiar el formulario
     function limpiarFormulario() {
-        $("#txtIdBitacora").val("")
-        $("#frmBitacora")[0].reset()
-        $("#btnGuardar").text("Guardar Registro")
-        $("#btnGuardar").removeClass("btn-warning").addClass("btn-primary")
+        BitacoraMediator.send('formulario', 'limpiar_formulario', {})
     }
 
     // Botón limpiar
@@ -677,32 +853,6 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Mensajes
     .click(function() {
         limpiarFormulario()
     })
-
-    // Función para cargar registro en el formulario para editar
-    function cargarRegistroParaEditar(idBitacora) {
-        $.get(`bitacora/${idBitacora}`, function(registro) {
-            $("#txtIdBitacora").val(registro.idBitacora)
-            $("#txtFecha").val(registro.fecha)
-            $("#txtHoraInicio").val(registro.horaInicio || "")
-            $("#txtHoraFin").val(registro.horaFin || "")
-            $("#txtDrenajeInicial").val(registro.drenajeInicial || "")
-            $("#txtUfTotal").val(registro.ufTotal || "")
-            $("#txtTiempoMedioPerm").val(registro.tiempoMedioPerm || "")
-            $("#txtLiquidoIngerido").val(registro.liquidoIngerido || "")
-            $("#txtCantidadOrina").val(registro.cantidadOrina || "")
-            $("#txtGlucosa").val(registro.glucosa || "")
-            $("#txtPresionArterial").val(registro.presionArterial || "")
-            
-            // Cambiar texto del botón
-            $("#btnGuardar").text("Actualizar Registro")
-            $("#btnGuardar").removeClass("btn-primary").addClass("btn-warning")
-            
-            // Scroll al formulario
-            $('html, body').animate({
-                scrollTop: $("#frmBitacora").offset().top - 100
-            }, 500)
-        })
-    }
 
     // Submit del formulario
     $("#frmBitacora")
@@ -728,11 +878,13 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Mensajes
         }, function (respuesta) {
             if (esEdicion) {
                 MensajesService.pop("Has actualizado un registro de bitácora.")
+                // Notificar a través del Mediator
+                BitacoraMediator.broadcast('registro_actualizado', { id: idBitacora })
             } else {
                 MensajesService.pop("Has agregado un registro de bitácora.")
+                // Notificar a través del Mediator
+                BitacoraMediator.broadcast('registro_guardado', { id: respuesta.id || idBitacora })
             }
-            // Limpiar el formulario
-            limpiarFormulario()
             enableAll()
         })
         disableAll()
@@ -801,9 +953,19 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Mensajes
         ])
     })
 })
-app.controller("bitacoraCtrl", function ($scope, $http) {
+app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaBitacoraComponent, BusquedaBitacoraComponent) {
     // Inicializar variables del scope
     $scope.mesSeleccionado = ""
+
+    // Registrar componentes en el Mediator
+    BitacoraMediator.register('lista', ListaBitacoraComponent)
+    BitacoraMediator.register('busqueda', BusquedaBitacoraComponent)
+    
+    // Exponer función globalmente para compatibilidad
+    window.$scope = $scope
+    window.buscarBitacora = function() {
+        $scope.buscarBitacora()
+    }
 
     // Función para obtener el nombre del mes
     function obtenerNombreMes(numeroMes) {
@@ -828,6 +990,9 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
                 </div>
             </div>
         `)
+        
+        // Notificar al Mediator sobre la búsqueda
+        BitacoraMediator.broadcast('mes_seleccionado', { mes: $scope.mesSeleccionado })
         
         // Preparar parámetros de búsqueda solo con mes
         const params = {
@@ -907,9 +1072,12 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
     $(document).off("click", ".btn-editar-bitacora")
     $(document).on("click", ".btn-editar-bitacora", function (event) {
         const id = $(this).data("id")
-        if (window.cargarRegistroParaEditar) {
-            window.cargarRegistroParaEditar(id)
-        }
+        // Cargar registro y usar Mediator para notificar al formulario
+        $.get(`bitacora/${id}`, function(registro) {
+            BitacoraMediator.send('formulario', 'cargar_para_editar', { registro: registro })
+            // Cambiar a la ruta de productos para mostrar el formulario
+            window.location.hash = "#/productos"
+        })
     })
 
     // Botón eliminar (desde bitácora)
@@ -925,6 +1093,8 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
                 }, function (respuesta) {
                     enableAll()
                     closeModal()
+                    // Notificar a través del Mediator
+                    BitacoraMediator.broadcast('registro_eliminado', { id: id })
                     $scope.buscarBitacora()
                 })
                 disableAll()

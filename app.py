@@ -20,7 +20,9 @@ from bitacora_service import (
     BitacoraFacade,
     BitacoraValidationDecorator,
     BitacoraDateFormatDecorator,
-    BitacoraCountDecorator
+    BitacoraCountDecorator,
+    BitacoraLogObserver,
+    BitacoraNotificationObserver
 )
 
 app            = Flask(__name__)
@@ -57,6 +59,12 @@ decorator_validation = BitacoraValidationDecorator(None)
 decorator_date_format = BitacoraDateFormatDecorator(decorator_validation)
 decorator_count = BitacoraCountDecorator(decorator_date_format)
 bitacora_facade.set_decorator_chain(decorator_count)
+
+# Configurar observadores (patrón Observer)
+log_observer = BitacoraLogObserver()
+notification_observer = BitacoraNotificationObserver()
+bitacora_facade.attach_observer(log_observer)
+bitacora_facade.attach_observer(notification_observer)
 
 def pusherProductos():    
     pusher_client = pusher.Pusher(

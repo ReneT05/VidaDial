@@ -1,5 +1,5 @@
 """
-Módulo que implementa los patrones Singleton, Factory, Facade y Decorator para el servicio de bitácora.
+Módulo que implementa los patrones Singleton, Factory, Facade, Decorator y Observer para el servicio de bitácora.
 """
 
 import mysql.connector
@@ -380,6 +380,7 @@ class BitacoraFacade:
         """
         self.connection_singleton = connection_singleton
         self.decorator_chain = None
+        self.subject = BitacoraSubject()  # Sujeto observable para el patrón Observer
     
     def set_decorator_chain(self, decorator: BitacoraDecorator):
         """
@@ -390,6 +391,24 @@ class BitacoraFacade:
             decorator: El último decorador de la cadena
         """
         self.decorator_chain = decorator
+    
+    def attach_observer(self, observer: BitacoraObserver):
+        """
+        Agrega un observador para recibir notificaciones de eventos.
+        
+        Args:
+            observer: Instancia de un observador
+        """
+        self.subject.attach(observer)
+    
+    def detach_observer(self, observer: BitacoraObserver):
+        """
+        Elimina un observador de la lista.
+        
+        Args:
+            observer: Instancia del observador a eliminar
+        """
+        self.subject.detach(observer)
     
     def buscar_por_mes(self, mes: int, aplicar_decoradores: bool = True) -> Dict[str, Any]:
         """
@@ -545,11 +564,20 @@ class BitacoraFacade:
             if cursor:
                 cursor.close()
             
-            return {
+            resultado = {
                 'success': True,
                 'id': registro_id,
                 'message': 'Registro guardado exitosamente' if not id_bitacora else 'Registro actualizado exitosamente'
             }
+            
+            # Notificar a los observadores
+            event_type = 'updated' if id_bitacora else 'created'
+            self.subject.notify(event_type, {
+                'id': registro_id,
+                'datos': datos
+            })
+            
+            return resultado
             
         except Exception as error:
             if con:
@@ -588,11 +616,17 @@ class BitacoraFacade:
             if cursor:
                 cursor.close()
             
-            return {
+            resultado = {
                 'success': filas_afectadas > 0,
                 'filas_afectadas': filas_afectadas,
                 'message': 'Registro eliminado exitosamente' if filas_afectadas > 0 else 'Registro no encontrado'
             }
+            
+            # Notificar a los observadores si se eliminó exitosamente
+            if filas_afectadas > 0:
+                self.subject.notify('deleted', {'id': id_bitacora})
+            
+            return resultado
             
         except Exception as error:
             if con:
