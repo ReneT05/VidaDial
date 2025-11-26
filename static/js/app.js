@@ -733,18 +733,26 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Categori
     })
     const channel = pusher.subscribe("canalProductos")
 
-    $("#frmProducto")
+    $("#frmBitacora")
     .off("submit")
     .submit(function (event) {
         event.preventDefault()
 
-        $.post("producto", {
-            id: "",
-            nombre: $("#txtNombre").val(),
-            precio: $("#txtPrecio").val(),
-            existencias: $("#txtExistencias").val(),
+        $.post("bitacora", {
+            fecha: $("#txtFecha").val(),
+            horaInicio: $("#txtHoraInicio").val(),
+            horaFin: $("#txtHoraFin").val(),
+            drenajeInicial: $("#txtDrenajeInicial").val(),
+            ufTotal: $("#txtUfTotal").val(),
+            tiempoMedioPerm: $("#txtTiempoMedioPerm").val(),
+            liquidoIngerido: $("#txtLiquidoIngerido").val(),
+            cantidadOrina: $("#txtCantidadOrina").val(),
+            glucosa: $("#txtGlucosa").val(),
+            presionArterial: $("#txtPresionArterial").val(),
         }, function (respuesta) {
-            MensajesService.pop("Has agregado un producto.")
+            MensajesService.pop("Has agregado un registro de bitácora.")
+            // Limpiar el formulario
+            $("#frmBitacora")[0].reset()
             enableAll()
         })
         disableAll()

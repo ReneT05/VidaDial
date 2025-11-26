@@ -363,6 +363,58 @@ def buscarBitacora():
 
     return make_response(jsonify(registros))
 
+@app.route("/bitacora", methods=["POST"])
+@login
+def guardarBitacora():
+    fecha = request.form.get("fecha", "").strip()
+    horaInicio = request.form.get("horaInicio", "").strip()
+    horaFin = request.form.get("horaFin", "").strip()
+    drenajeInicial = request.form.get("drenajeInicial", "").strip()
+    ufTotal = request.form.get("ufTotal", "").strip()
+    tiempoMedioPerm = request.form.get("tiempoMedioPerm", "").strip()
+    liquidoIngerido = request.form.get("liquidoIngerido", "").strip()
+    cantidadOrina = request.form.get("cantidadOrina", "").strip()
+    glucosa = request.form.get("glucosa", "").strip()
+    presionArterial = request.form.get("presionArterial", "").strip()
+
+    # Convertir valores vacíos a None para campos numéricos
+    drenajeInicial = float(drenajeInicial) if drenajeInicial else None
+    ufTotal = float(ufTotal) if ufTotal else None
+    tiempoMedioPerm = float(tiempoMedioPerm) if tiempoMedioPerm else None
+    liquidoIngerido = float(liquidoIngerido) if liquidoIngerido else None
+    cantidadOrina = float(cantidadOrina) if cantidadOrina else None
+    glucosa = float(glucosa) if glucosa else None
+
+    # Obtener conexión usando el Singleton
+    con = None
+    try:
+        con = bitacora_connection.get_connection()
+        cursor = con.cursor()
+
+        sql = """
+        INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
+                             tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        val = (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
+               tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
+
+        cursor.execute(sql, val)
+        con.commit()
+
+        if cursor:
+            cursor.close()
+
+    except Exception as error:
+        if con:
+            con.rollback()
+        return make_response(jsonify({"error": str(error)}), 400)
+    finally:
+        if con and con.is_connected():
+            con.close()
+
+    return make_response(jsonify({"success": True}))
+
 @app.route("/bitacora/eliminar", methods=["POST"])
 def eliminarRegistro():
     id = request.form["id"]
