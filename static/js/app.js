@@ -383,9 +383,15 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
         preferencias = {}
     }
     $rootScope.preferencias = preferencias
-    SesionService.setTipo(preferencias.tipo)
-    SesionService.setUsr(preferencias.usr)
-    SesionService.setId(preferencias.id)
+    const tipoPreferencias = (preferencias.tipo !== undefined && preferencias.tipo !== null)
+        ? preferencias.tipo
+        : preferencias.tipo_usuario
+    SesionService.setTipo(tipoPreferencias)
+    SesionService.setUsr(preferencias.usr || preferencias.nombre)
+    const idPreferencias = (preferencias.idUsuario !== undefined && preferencias.idUsuario !== null)
+        ? preferencias.idUsuario
+        : preferencias.id
+    SesionService.setId(idPreferencias)
 
 
     $rootScope.$on("$routeChangeSuccess", function (event, current, previous) {
@@ -763,14 +769,20 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
                         localStorage.setItem("flask-preferencias", JSON.stringify(preferencias))
                         
                         // Actualizar SesionService con los datos del usuario
-                        if (preferencias.usr) {
-                            SesionService.setUsr(preferencias.usr)
+                        if (preferencias.usr || preferencias.nombre) {
+                            SesionService.setUsr(preferencias.usr || preferencias.nombre)
                         }
-                        if (preferencias.tipo !== undefined) {
-                            SesionService.setTipo(preferencias.tipo)
+                        if (preferencias.tipo !== undefined || preferencias.tipo_usuario !== undefined) {
+                            const tipo = (preferencias.tipo !== undefined && preferencias.tipo !== null)
+                                ? preferencias.tipo
+                                : preferencias.tipo_usuario
+                            SesionService.setTipo(tipo)
                         }
-                        if (preferencias.id !== undefined) {
-                            SesionService.setId(preferencias.id)
+                        if (preferencias.idUsuario !== undefined || preferencias.id !== undefined) {
+                            const id = (preferencias.idUsuario !== undefined && preferencias.idUsuario !== null)
+                                ? preferencias.idUsuario
+                                : preferencias.id
+                            SesionService.setId(id)
                         }
                         
                         $rootScope.redireccionar(login, preferencias)
@@ -827,7 +839,7 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
         $rootScope.spinnerGrow = true
     })
 }])
-app.controller("loginCtrl", function ($scope, $http, $rootScope) {
+app.controller("loginCtrl", function ($scope, $http, $rootScope, SesionService) {
     $("#frmInicioSesion").submit(function (event) {
         event.preventDefault()
 
@@ -837,13 +849,20 @@ app.controller("loginCtrl", function ($scope, $http, $rootScope) {
             enableAll()
 
             if (respuesta.length) {
+                const datosUsuario = respuesta[0] || {}
                 localStorage.setItem("flask-login", "1")
-                localStorage.setItem("flask-preferencias", JSON.stringify(respuesta[0]))
+                localStorage.setItem("flask-preferencias", JSON.stringify(datosUsuario))
                 
                 // Actualizar SesionService
-                SesionService.setUsr(respuesta[0].nombre)
-                SesionService.setTipo(respuesta[0].tipo_usuario)
-                SesionService.setId(respuesta[0].id)
+                SesionService.setUsr(datosUsuario.nombre || datosUsuario.usr)
+                const tipoUsuarioLogin = (datosUsuario.tipo_usuario !== undefined && datosUsuario.tipo_usuario !== null)
+                    ? datosUsuario.tipo_usuario
+                    : datosUsuario.tipo
+                const idUsuarioLogin = (datosUsuario.idUsuario !== undefined && datosUsuario.idUsuario !== null)
+                    ? datosUsuario.idUsuario
+                    : datosUsuario.id
+                SesionService.setTipo(tipoUsuarioLogin)
+                SesionService.setId(idUsuarioLogin)
                 
                 $("#frmInicioSesion").get(0).reset()
                 location.reload()

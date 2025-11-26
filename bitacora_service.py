@@ -77,7 +77,7 @@ class BitacoraSearchByMonth(BitacoraSearchStrategy):
         try:
             cursor = connection.cursor(dictionary=True)
             # Buscamos registros donde el mes coincida y pertenezcan al usuario
-            if id_usuario:
+            if id_usuario is not None:
                 sql = """
                 SELECT *
                 FROM bitacora
@@ -611,7 +611,7 @@ class BitacoraFacade:
             con = self.connection_singleton.get_connection()
             cursor = con.cursor(dictionary=True)
             
-            if id_usuario:
+            if id_usuario is not None:
                 sql = "SELECT * FROM bitacora WHERE idBitacora = %s AND idUsuario = %s"
                 val = (id_bitacora, id_usuario)
             else:
@@ -645,7 +645,8 @@ class BitacoraFacade:
             if con and con.is_connected():
                 con.close()
     
-    def guardar_registro(self, datos: Dict[str, Any], tipo_usuario: Optional[int] = None, id_usuario: Optional[int] = None) -> Dict[str, Any]:
+    def guardar_registro(self, datos: Dict[str, Any], tipo_usuario: Optional[int] = None,
+                         id_usuario: Optional[int] = None, es_admin: bool = False) -> Dict[str, Any]:
         """
         Guarda un nuevo registro o actualiza uno existente en la bitácora.
         
@@ -669,7 +670,7 @@ class BitacoraFacade:
             if id_bitacora:
                 # Actualizar registro existente
                 # Verificar que el registro pertenezca al usuario si se proporciona id_usuario
-                if id_usuario:
+                if id_usuario and not es_admin:
                     # Primero verificar que el registro pertenezca al usuario
                     cursor_check = con.cursor(dictionary=True)
                     cursor_check.execute("SELECT idUsuario FROM bitacora WHERE idBitacora = %s", (id_bitacora,))
@@ -779,7 +780,8 @@ class BitacoraFacade:
             if con and con.is_connected():
                 con.close()
     
-    def eliminar_registro(self, id_bitacora: int, tipo_usuario: Optional[int] = None, id_usuario: Optional[int] = None) -> Dict[str, Any]:
+    def eliminar_registro(self, id_bitacora: int, tipo_usuario: Optional[int] = None,
+                           id_usuario: Optional[int] = None, es_admin: bool = False) -> Dict[str, Any]:
         """
         Elimina un registro de la bitácora.
         
@@ -797,7 +799,7 @@ class BitacoraFacade:
             cursor = con.cursor()
             
             # Si se proporciona id_usuario, verificar que el registro pertenezca al usuario
-            if id_usuario:
+            if id_usuario and not es_admin:
                 cursor_check = con.cursor(dictionary=True)
                 cursor_check.execute("SELECT idUsuario FROM bitacora WHERE idBitacora = %s", (id_bitacora,))
                 registro_existente = cursor_check.fetchone()
