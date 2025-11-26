@@ -1,3 +1,37 @@
+<div class="input-group mb-3">
+    <div class="row w-100">
+        <div class="col-md-3">
+            <label for="selectMes" class="form-label">Mes:</label>
+            <select id="selectMes" class="form-select" ng-model="mesSeleccionado" ng-change="buscarBitacora()">
+                <option value="">Todos los meses</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="selectAño" class="form-label">Año:</label>
+            <select id="selectAño" class="form-select" ng-model="añoSeleccionado" ng-change="buscarBitacora()">
+                <option value="">Todos los años</option>
+                <option ng-repeat="año in añosDisponibles" value="{{año}}">{{año}}</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="busquedaTexto" class="form-label">Búsqueda por texto:</label>
+            <input type="text" id="busquedaTexto" class="form-control" ng-model="busquedaTexto" 
+                   placeholder="Buscar por ID, fecha o glucosa..." ng-change="buscarBitacora()">
+        </div>
+    </div>
+</div>
 <div class="input-group">
     <input type="text" id="tablabitacora" name="tablabitacora" class="form-control text-end"
         style="border: none !important;" ng-model="tablabitacora" readonly>

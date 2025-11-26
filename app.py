@@ -14,6 +14,8 @@ import pusher
 import pytz
 import datetime
 
+from bitacora_service import BitacoraConnectionSingleton, BitacoraSearchFactory
+
 app            = Flask(__name__)
 app.secret_key = "Test12345"
 CORS(app)
@@ -36,6 +38,9 @@ con_pool = mysql.connector.pooling.MySQLConnectionPool(
     password="Test12345"
 )
 """
+
+# Inicializar el Singleton para la conexión de bitácora
+bitacora_connection = BitacoraConnectionSingleton.get_instance(con_pool)
 
 def pusherProductos():    
     pusher_client = pusher.Pusher(
@@ -334,33 +339,29 @@ def eliminarProducto():
 @app.route("/bitacora/buscar", methods=["GET"])
 @login
 def buscarBitacora():
-    args     = request.args
-    busqueda = args["busqueda"]
-    busqueda = f"%{busqueda}%"
+    args = request.args
+    busqueda = args.get("busqueda", "").strip()
+    mes = args.get("mes", "").strip()
+    año = args.get("año", "").strip()
 
+    # Preparar parámetros para el Factory
+    params = {
+        "busqueda": busqueda,
+        "mes": int(mes) if mes and mes.isdigit() else None,
+        "año": int(año) if año and año.isdigit() else None
+    }
+
+    # Usar el Factory para obtener la estrategia de búsqueda apropiada
+    search_strategy = BitacoraSearchFactory.create_search_strategy(params)
+
+    # Obtener conexión usando el Singleton
+    con = None
     try:
-        con    = con_pool.get_connection()
-        cursor = con.cursor(dictionary=True)
-        sql    = """
-SELECT *
-FROM bitacora
-WHERE 
-    idBitacora LIKE %s OR
-    fecha LIKE %s OR
-    glucosa LIKE %s
-ORDER BY idBitacora DESC;
-        """ 
-        val    = (busqueda, busqueda, busqueda )
-
-        cursor.execute(sql, val)
-        registros = cursor.fetchall()
-
-    except mysql.connector.errors.ProgrammingError as error:
+        con = bitacora_connection.get_connection()
+        registros = search_strategy.search(con, params)
+    except Exception as error:
         registros = []
-
     finally:
-        if cursor:
-            cursor.close()
         if con and con.is_connected():
             con.close()
 

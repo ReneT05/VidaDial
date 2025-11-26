@@ -814,46 +814,86 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Categori
     })
 })
 app.controller("bitacoraCtrl", function ($scope, $http) {
-    function buscarBitacora() {
+    // Inicializar variables del scope
+    $scope.mesSeleccionado = ""
+    $scope.añoSeleccionado = ""
+    $scope.busquedaTexto = ""
+
+    // Inicializar años disponibles (últimos 10 años y próximos 2)
+    const añoActual = new Date().getFullYear()
+    $scope.añosDisponibles = []
+    for (let i = añoActual - 10; i <= añoActual + 2; i++) {
+        $scope.añosDisponibles.push(i)
+    }
+
+    // Función para buscar bitácora con los parámetros seleccionados
+    $scope.buscarBitacora = function() {
         $("#tbodyBitacora").html(`<tr>
-            <th colspan="5" class="text-center">
+            <th colspan="14" class="text-center">
                 <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
                     <span class="visually-hidden">Cargando...</span>
                 </div>
             </th>
         </tr>`)
-        $.get("bitacora/buscar", {
-            busqueda: ""
-        }, function (registro) {
+        
+        // Preparar parámetros de búsqueda
+        const params = {
+            busqueda: $scope.busquedaTexto || ""
+        }
+        
+        // Agregar mes y año si están seleccionados
+        if ($scope.mesSeleccionado) {
+            params.mes = $scope.mesSeleccionado
+        }
+        if ($scope.añoSeleccionado) {
+            params.año = $scope.añoSeleccionado
+        }
+        
+        $.get("bitacora/buscar", params, function (registro) {
             enableAll()
-            $scope.bitacora = registro.length
+            $scope.$apply(function() {
+                $scope.bitacora = registro.length
+            })
             $("#tbodyBitacora").html("")
-            for (let x in registro) {
-                const item = registro[x]
-
-                $("#tbodyBitacora").append(`<tr>
-                    <td>${item.idBitacora}</td>
-                    <td>${item.fecha}</td>
-                    <td>${item.horaInicio}</td>
-                    <td>${item.horaFin}</td>
-                    <td>${item.drenajeInicial}</td>
-                    <td>${item.ufTotal}</td>
-                    <td>${item.tiempoMedioPerm}</td>
-                    <td>${item.liquidoIngerido}</td>
-                    <td>${item.cantidadOrina}</td>                   
-                    <td>${item.glucosa}</td>
-                    <td>${item.presionArterial}</td>
-                    <td>${item.fechaCreacion}</td>
-                    <td>${item.fechaActualizacion}</td>
-                    <td>
-                        <button class="btn btn-danger btn-eliminar while-waiting" data-id="${item.idBitacora}">Eliminar</button><br>
-                    </td>
+            
+            if (registro.length === 0) {
+                $("#tbodyBitacora").html(`<tr>
+                    <td colspan="14" class="text-center">No se encontraron registros</td>
                 </tr>`)
+            } else {
+                for (let x in registro) {
+                    const item = registro[x]
+
+                    $("#tbodyBitacora").append(`<tr>
+                        <td>${item.idBitacora}</td>
+                        <td>${item.fecha}</td>
+                        <td>${item.horaInicio}</td>
+                        <td>${item.horaFin}</td>
+                        <td>${item.drenajeInicial}</td>
+                        <td>${item.ufTotal}</td>
+                        <td>${item.tiempoMedioPerm}</td>
+                        <td>${item.liquidoIngerido}</td>
+                        <td>${item.cantidadOrina}</td>                   
+                        <td>${item.glucosa}</td>
+                        <td>${item.presionArterial}</td>
+                        <td>${item.fechaCreacion}</td>
+                        <td>${item.fechaActualizacion}</td>
+                        <td>
+                            <button class="btn btn-danger btn-eliminar while-waiting" data-id="${item.idBitacora}">Eliminar</button><br>
+                        </td>
+                    </tr>`)
+                }
             }
         })
         disableAll()
     }
 
+    // Función interna para mantener compatibilidad
+    function buscarBitacora() {
+        $scope.buscarBitacora()
+    }
+
+    // Cargar datos iniciales
     buscarBitacora()
 
 
@@ -879,7 +919,7 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
                 }, function (respuesta) {
                     enableAll()
                     closeModal()
-                    buscarBitacora()
+                    $scope.buscarBitacora()
                 })
                 disableAll()
             }}
