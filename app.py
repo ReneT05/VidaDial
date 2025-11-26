@@ -393,6 +393,9 @@ def guardarBitacora():
     # Recopilar datos del formulario
     id_bitacora = request.form.get("id", "").strip()
     
+    # Obtener tipo de usuario de la sesión
+    tipo_usuario = session.get("login-tipo", 0)
+    
     datos = {
         "fecha": request.form.get("fecha", "").strip(),
         "horaInicio": request.form.get("horaInicio", "").strip() or None,
@@ -419,7 +422,8 @@ def guardarBitacora():
         datos[campo] = float(valor) if valor else None
 
     # Usar el Facade para guardar (simplifica todo el proceso)
-    resultado = bitacora_facade.guardar_registro(datos)
+    # Pasar tipo_usuario para que los observadores puedan filtrar
+    resultado = bitacora_facade.guardar_registro(datos, tipo_usuario=tipo_usuario)
 
     if resultado.get('success'):
         return make_response(jsonify({"success": True, "id": resultado.get('id')}))
@@ -439,8 +443,12 @@ def eliminarRegistro():
     except ValueError:
         return make_response(jsonify({"error": "ID inválido"}), 400)
 
+    # Obtener tipo de usuario de la sesión
+    tipo_usuario = session.get("login-tipo", 0)
+
     # Usar el Facade para eliminar (simplifica todo el proceso)
-    resultado = bitacora_facade.eliminar_registro(id_int)
+    # Pasar tipo_usuario para que los observadores puedan filtrar
+    resultado = bitacora_facade.eliminar_registro(id_int, tipo_usuario=tipo_usuario)
 
     if resultado.get('success'):
         return make_response(jsonify({"success": True}))

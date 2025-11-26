@@ -432,10 +432,23 @@ class BitacoraLogObserver(BitacoraObserver):
     """
     Observador concreto que registra eventos en un log.
     Implementa el patrón Observer para logging de eventos.
+    Solo notifica a usuarios con tipo_usuario = 1.
     """
     
     def update(self, event_type: str, data: Dict[str, Any]):
-        """Registra el evento en el log."""
+        """
+        Registra el evento en el log solo si el usuario es tipo 1.
+        
+        Args:
+            event_type: Tipo de evento
+            data: Datos del evento (debe incluir 'tipo_usuario')
+        """
+        tipo_usuario = data.get('tipo_usuario')
+        
+        # Solo mostrar mensajes a usuarios tipo 1
+        if tipo_usuario != 1:
+            return
+        
         registro_id = data.get('id', 'N/A')
         mensaje = f"[BITACORA LOG] Evento: {event_type.upper()}, Registro ID: {registro_id}"
         print(mensaje)
@@ -445,10 +458,23 @@ class BitacoraNotificationObserver(BitacoraObserver):
     """
     Observador concreto que envía notificaciones sobre eventos.
     Puede extenderse para integrar con sistemas de notificaciones.
+    Solo notifica a usuarios con tipo_usuario = 1.
     """
     
     def update(self, event_type: str, data: Dict[str, Any]):
-        """Envía una notificación sobre el evento."""
+        """
+        Envía una notificación sobre el evento solo si el usuario es tipo 1.
+        
+        Args:
+            event_type: Tipo de evento
+            data: Datos del evento (debe incluir 'tipo_usuario')
+        """
+        tipo_usuario = data.get('tipo_usuario')
+        
+        # Solo mostrar notificaciones a usuarios tipo 1
+        if tipo_usuario != 1:
+            return
+        
         registro_id = data.get('id', 'N/A')
         
         if event_type == 'created':
@@ -601,12 +627,13 @@ class BitacoraFacade:
             if con and con.is_connected():
                 con.close()
     
-    def guardar_registro(self, datos: Dict[str, Any]) -> Dict[str, Any]:
+    def guardar_registro(self, datos: Dict[str, Any], tipo_usuario: Optional[int] = None) -> Dict[str, Any]:
         """
         Guarda un nuevo registro o actualiza uno existente en la bitácora.
         
         Args:
             datos: Diccionario con los datos del registro (debe incluir 'id' si es actualización)
+            tipo_usuario: Tipo de usuario que realiza la operación (opcional)
         
         Returns:
             Diccionario con el resultado de la operación
@@ -674,10 +701,12 @@ class BitacoraFacade:
             
             # Notificar a los observadores
             event_type = 'updated' if id_bitacora else 'created'
-            self.subject.notify(event_type, {
+            notification_data = {
                 'id': registro_id,
-                'datos': datos
-            })
+                'datos': datos,
+                'tipo_usuario': tipo_usuario  # Incluir tipo de usuario para filtrado
+            }
+            self.subject.notify(event_type, notification_data)
             
             return resultado
             
@@ -693,12 +722,13 @@ class BitacoraFacade:
             if con and con.is_connected():
                 con.close()
     
-    def eliminar_registro(self, id_bitacora: int) -> Dict[str, Any]:
+    def eliminar_registro(self, id_bitacora: int, tipo_usuario: Optional[int] = None) -> Dict[str, Any]:
         """
         Elimina un registro de la bitácora.
         
         Args:
             id_bitacora: ID del registro a eliminar
+            tipo_usuario: Tipo de usuario que realiza la operación (opcional)
         
         Returns:
             Diccionario con el resultado de la operación
@@ -726,7 +756,10 @@ class BitacoraFacade:
             
             # Notificar a los observadores si se eliminó exitosamente
             if filas_afectadas > 0:
-                self.subject.notify('deleted', {'id': id_bitacora})
+                self.subject.notify('deleted', {
+                    'id': id_bitacora,
+                    'tipo_usuario': tipo_usuario  # Incluir tipo de usuario para filtrado
+                })
             
             return resultado
             
