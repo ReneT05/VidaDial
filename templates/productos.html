@@ -1,9 +1,15 @@
 <div class="card text-bg-success mb-3" style="max-width: 18rem;">
     <div class="card-header">Bitácora</div>
     <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-info"></i> Información</h5>
-        <p class="card-text">
-           Hola {{ "{{ SesionService.getUsr() }}" }}! {{ "En este módulo puedes agregar registros de bitácora." }}
+        <h5 class="card-title"><i class="bi bi-info"></i> Información del Usuario</h5>
+        <p class="card-text mb-1">
+           <strong>Usuario:</strong> {{ "{{ SesionService.getUsr() }}" }}
+        </p>
+        <p class="card-text mb-1">
+           <strong>Tipo:</strong> {{ "{{ SesionService.getTipo() == 1 ? 'Administrador' : 'Usuario' }}" }}
+        </p>
+        <p class="card-text mb-0">
+           <small>En este módulo puedes agregar y gestionar tus registros de bitácora.</small>
         </p>
     </div>
 </div>

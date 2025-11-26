@@ -131,11 +131,13 @@ def iniciarSesion():
     session["login"]      = False
     session["login-usr"]  = None
     session["login-tipo"] = 0
+    session["login-id"]   = None
     if registros:
         usuario = registros[0]
         session["login"]      = True
         session["login-usr"]  = usuario["nombre"]
         session["login-tipo"] = usuario["tipo_usuario"]
+        session["login-id"]   = usuario["id"]
 
     return make_response(jsonify(registros))
 
@@ -145,6 +147,7 @@ def cerrarSesion():
     session["login"]      = False
     session["login-usr"]  = None
     session["login-tipo"] = 0
+    session["login-id"]   = None
     return make_response(jsonify({}))
 
 @app.route("/preferencias")
@@ -152,7 +155,8 @@ def cerrarSesion():
 def preferencias():
     return make_response(jsonify({
         "usr": session.get("login-usr"),
-        "tipo": session.get("login-tipo", 2)
+        "tipo": session.get("login-tipo", 2),
+        "id": session.get("login-id")
     }))
 
 @app.route("/log", methods=["GET"])
@@ -369,8 +373,11 @@ def buscarBitacora():
     # Convertir mes a entero
     mes_int = int(mes) if mes and mes.isdigit() else None
 
+    # Obtener ID del usuario de la sesión
+    id_usuario = session.get("login-id")
+
     # Usar el Facade para buscar (simplifica todo el proceso)
-    resultado = bitacora_facade.buscar_por_mes(mes_int, aplicar_decoradores=True)
+    resultado = bitacora_facade.buscar_por_mes(mes_int, id_usuario=id_usuario, aplicar_decoradores=True)
 
     # Retornar solo los registros para mantener compatibilidad con el frontend
     # El frontend puede acceder a resultado['registros'] o usar resultado completo
@@ -380,7 +387,9 @@ def buscarBitacora():
 @login
 def obtenerBitacora(id):
     """Obtiene un registro de bitácora por su ID."""
-    resultado = bitacora_facade.obtener_registro(id)
+    # Obtener ID del usuario de la sesión
+    id_usuario = session.get("login-id")
+    resultado = bitacora_facade.obtener_registro(id, id_usuario=id_usuario)
     
     if resultado.get('success'):
         return make_response(jsonify(resultado.get('registro')))
@@ -393,8 +402,9 @@ def guardarBitacora():
     # Recopilar datos del formulario
     id_bitacora = request.form.get("id", "").strip()
     
-    # Obtener tipo de usuario de la sesión
+    # Obtener tipo de usuario y ID de usuario de la sesión
     tipo_usuario = session.get("login-tipo", 0)
+    id_usuario = session.get("login-id")
     
     datos = {
         "fecha": request.form.get("fecha", "").strip(),
@@ -423,7 +433,8 @@ def guardarBitacora():
 
     # Usar el Facade para guardar (simplifica todo el proceso)
     # Pasar tipo_usuario para que los observadores puedan filtrar
-    resultado = bitacora_facade.guardar_registro(datos, tipo_usuario=tipo_usuario)
+    # Pasar id_usuario para asociar el registro al usuario
+    resultado = bitacora_facade.guardar_registro(datos, tipo_usuario=tipo_usuario, id_usuario=id_usuario)
 
     if resultado.get('success'):
         return make_response(jsonify({"success": True, "id": resultado.get('id')}))
@@ -443,12 +454,14 @@ def eliminarRegistro():
     except ValueError:
         return make_response(jsonify({"error": "ID inválido"}), 400)
 
-    # Obtener tipo de usuario de la sesión
+    # Obtener tipo de usuario e ID de usuario de la sesión
     tipo_usuario = session.get("login-tipo", 0)
+    id_usuario = session.get("login-id")
 
     # Usar el Facade para eliminar (simplifica todo el proceso)
     # Pasar tipo_usuario para que los observadores puedan filtrar
-    resultado = bitacora_facade.eliminar_registro(id_int, tipo_usuario=tipo_usuario)
+    # Pasar id_usuario para verificar permisos
+    resultado = bitacora_facade.eliminar_registro(id_int, tipo_usuario=tipo_usuario, id_usuario=id_usuario)
 
     if resultado.get('success'):
         return make_response(jsonify({"success": True}))

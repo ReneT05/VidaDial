@@ -52,6 +52,7 @@ const app = angular.module("angularjsApp", ["ngRoute"])
 app.service("SesionService", function () {
     this.tipo = null
     this.usr  = null
+    this.id   = null
 
     this.setTipo = function (tipo) {
         this.tipo = tipo
@@ -65,6 +66,13 @@ app.service("SesionService", function () {
     }
     this.getUsr = function () {
         return this.usr
+    }
+
+    this.setId = function (id) {
+        this.id = id
+    }
+    this.getId = function () {
+        return this.id
     }
 })
 app.factory("CategoriaFactory", function () {
@@ -377,6 +385,7 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
     $rootScope.preferencias = preferencias
     SesionService.setTipo(preferencias.tipo)
     SesionService.setUsr(preferencias.usr)
+    SesionService.setId(preferencias.id)
 
 
     $rootScope.$on("$routeChangeSuccess", function (event, current, previous) {
@@ -752,6 +761,18 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
 
                         localStorage.setItem("flask-login", login)
                         localStorage.setItem("flask-preferencias", JSON.stringify(preferencias))
+                        
+                        // Actualizar SesionService con los datos del usuario
+                        if (preferencias.usr) {
+                            SesionService.setUsr(preferencias.usr)
+                        }
+                        if (preferencias.tipo !== undefined) {
+                            SesionService.setTipo(preferencias.tipo)
+                        }
+                        if (preferencias.id !== undefined) {
+                            SesionService.setId(preferencias.id)
+                        }
+                        
                         $rootScope.redireccionar(login, preferencias)
                     })
 
@@ -818,6 +839,12 @@ app.controller("loginCtrl", function ($scope, $http, $rootScope) {
             if (respuesta.length) {
                 localStorage.setItem("flask-login", "1")
                 localStorage.setItem("flask-preferencias", JSON.stringify(respuesta[0]))
+                
+                // Actualizar SesionService
+                SesionService.setUsr(respuesta[0].nombre)
+                SesionService.setTipo(respuesta[0].tipo_usuario)
+                SesionService.setId(respuesta[0].id)
+                
                 $("#frmInicioSesion").get(0).reset()
                 location.reload()
                 return
@@ -966,6 +993,20 @@ app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaB
     window.buscarBitacora = function() {
         $scope.buscarBitacora()
     }
+    
+    // Mostrar mensaje inicial cuando se carga la página
+    $scope.$watch('mesSeleccionado', function(newVal, oldVal) {
+        if (newVal === "" && oldVal === undefined) {
+            // Primera carga, mostrar mensaje inicial
+            $("#contenedorTarjetas").html(`
+                <div class="col-12">
+                    <div class="alert alert-info text-center" role="alert">
+                        <i class="bi bi-info-circle"></i> Por favor, selecciona un mes para ver tus registros de bitácora.
+                    </div>
+                </div>
+            `)
+        }
+    })
 
     // Función para obtener el nombre del mes
     function obtenerNombreMes(numeroMes) {
@@ -976,9 +1017,15 @@ app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaB
 
     // Función para buscar bitácora solo por mes
     $scope.buscarBitacora = function() {
-        // Si no hay mes seleccionado, mostrar vacío
+        // Si no hay mes seleccionado, mostrar mensaje
         if (!$scope.mesSeleccionado) {
-            $("#contenedorTarjetas").html("")
+            $("#contenedorTarjetas").html(`
+                <div class="col-12">
+                    <div class="alert alert-info text-center" role="alert">
+                        <i class="bi bi-info-circle"></i> Por favor, selecciona un mes para ver tus registros de bitácora.
+                    </div>
+                </div>
+            `)
             return
         }
 
@@ -1046,8 +1093,17 @@ app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaB
                     `
                     $("#contenedorTarjetas").append(tarjeta)
                 }
+            } else {
+                // Si no hay registros, mostrar mensaje
+                const nombreMes = obtenerNombreMes($scope.mesSeleccionado)
+                $("#contenedorTarjetas").html(`
+                    <div class="col-12">
+                        <div class="alert alert-warning text-center" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> No se encontraron registros de bitácora para el mes de ${nombreMes}.
+                        </div>
+                    </div>
+                `)
             }
-            // Si no hay registros, no mostrar nada (vacío)
         })
         disableAll()
     }
