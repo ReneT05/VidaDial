@@ -97,10 +97,10 @@ def obtener_contexto_usuario():
     """
     Retorna información de la sesión del usuario.
     """
-    tipo_usuario = session.get("login-tipo", 0)
-    id_usuario = session.get("login-id")
+    tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
     es_admin = (tipo_usuario == 1)
-    return tipo_usuario, id_usuario, es_admin
+    paciente = session.get("login-usr")
+    return tipo_usuario, id_usuario, es_admin, paciente
 
 @app.route("/")
 def dashboard():
@@ -155,7 +155,8 @@ def preferencias():
         "usr": session.get("login-usr"),
         "tipo": session.get("login-tipo", 2),
         "id": session.get("login-id"),
-        "idUsuario": session.get("login-id")
+        "idUsuario": session.get("login-id"),
+        "paciente": session.get("login-usr")
     }))
 
 @app.route("/log", methods=["GET"])
@@ -368,18 +369,26 @@ def eliminarProducto():
 def buscarBitacora():
     args = request.args
     mes = args.get("mes", "").strip()
+    paciente_param = args.get("paciente", "").strip()
 
     # Convertir mes a entero
     mes_int = int(mes) if mes and mes.isdigit() else None
 
     # Definir contexto de usuario para aplicar reglas por rol
-    tipo_usuario, id_usuario, es_admin = obtener_contexto_usuario()
-    filtro_usuario = None if es_admin else id_usuario
+    tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
+
+    if es_admin:
+        filtro_paciente = paciente_param or None
+        filtro_usuario = None
+    else:
+        filtro_paciente = paciente_sesion
+        filtro_usuario = id_usuario
 
     # Usar el Facade para buscar (simplifica todo el proceso)
     resultado = bitacora_facade.buscar_por_mes(
         mes_int,
         id_usuario=filtro_usuario,
+        paciente=filtro_paciente,
         aplicar_decoradores=True
     )
 
@@ -391,9 +400,14 @@ def buscarBitacora():
 @login
 def obtenerBitacora(id):
     """Obtiene un registro de bitácora por su ID."""
-    tipo_usuario, id_usuario, es_admin = obtener_contexto_usuario()
+    tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
     filtro_usuario = None if es_admin else id_usuario
-    resultado = bitacora_facade.obtener_registro(id, id_usuario=filtro_usuario)
+    filtro_paciente = None if es_admin else paciente_sesion
+    resultado = bitacora_facade.obtener_registro(
+        id,
+        id_usuario=filtro_usuario,
+        paciente=filtro_paciente
+    )
     
     if resultado.get('success'):
         return make_response(jsonify(resultado.get('registro')))
@@ -407,7 +421,13 @@ def guardarBitacora():
     id_bitacora = request.form.get("id", "").strip()
     
     # Obtener contexto de usuario
-    tipo_usuario, id_usuario, es_admin = obtener_contexto_usuario()
+    tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
+    
+    paciente = request.form.get("paciente", "").strip()
+    if not es_admin:
+        paciente = paciente_sesion or paciente
+    if not paciente:
+        return make_response(jsonify({"error": "El campo paciente es obligatorio"}), 400)
     
     datos = {
         "fecha": request.form.get("fecha", "").strip(),
@@ -419,7 +439,8 @@ def guardarBitacora():
         "liquidoIngerido": None,
         "cantidadOrina": None,
         "glucosa": None,
-        "presionArterial": request.form.get("presionArterial", "").strip() or None
+        "presionArterial": request.form.get("presionArterial", "").strip() or None,
+        "paciente": paciente
     }
 
     # Agregar ID si existe (para actualización)
@@ -441,7 +462,8 @@ def guardarBitacora():
         datos,
         tipo_usuario=tipo_usuario,
         id_usuario=id_usuario,
-        es_admin=es_admin
+        es_admin=es_admin,
+        paciente_contexto=None if es_admin else paciente_sesion
     )
 
     if resultado.get('success'):
@@ -463,7 +485,7 @@ def eliminarRegistro():
         return make_response(jsonify({"error": "ID inválido"}), 400)
 
     # Obtener contexto de usuario
-    tipo_usuario, id_usuario, es_admin = obtener_contexto_usuario()
+    tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
 
     # Usar el Facade para eliminar (simplifica todo el proceso)
     # Pasar tipo_usuario para que los observadores puedan filtrar
@@ -472,7 +494,8 @@ def eliminarRegistro():
         id_int,
         tipo_usuario=tipo_usuario,
         id_usuario=id_usuario,
-        es_admin=es_admin
+        es_admin=es_admin,
+        paciente_contexto=None if es_admin else paciente_sesion
     )
 
     if resultado.get('success'):

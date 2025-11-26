@@ -222,6 +222,8 @@ app.factory("FormularioBitacoraComponent", function(BitacoraMediator) {
         limpiar: function() {
             $("#txtIdBitacora").val("")
             $("#frmBitacora")[0].reset()
+            const pacienteDefault = $("#txtPaciente").data("defaultPaciente") || ""
+            $("#txtPaciente").val(pacienteDefault)
             $("#btnGuardar").text("Guardar Registro")
             $("#btnGuardar").removeClass("btn-warning").addClass("btn-primary")
         },
@@ -240,6 +242,7 @@ app.factory("FormularioBitacoraComponent", function(BitacoraMediator) {
             $("#txtCantidadOrina").val(registro.cantidadOrina || "")
             $("#txtGlucosa").val(registro.glucosa || "")
             $("#txtPresionArterial").val(registro.presionArterial || "")
+            $("#txtPaciente").val(registro.paciente || "")
             
             $("#btnGuardar").text("Actualizar Registro")
             $("#btnGuardar").removeClass("btn-primary").addClass("btn-warning")
@@ -880,6 +883,14 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Mensajes
 
     // Registrar el componente del formulario en el Mediator
     BitacoraMediator.register('formulario', FormularioBitacoraComponent)
+
+    // Configurar paciente por defecto en el formulario
+    const pacienteSesion = SesionService.getUsr() || ""
+    $("#txtPaciente").val(pacienteSesion)
+    $("#txtPaciente").data("defaultPaciente", pacienteSesion)
+    if (SesionService.getTipo() !== 1) {
+        $("#txtPaciente").attr("readonly", true)
+    }
     
     // Exponer función globalmente para compatibilidad
     window.cargarRegistroParaEditar = function(idBitacora) {
@@ -921,6 +932,7 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Mensajes
             cantidadOrina: $("#txtCantidadOrina").val(),
             glucosa: $("#txtGlucosa").val(),
             presionArterial: $("#txtPresionArterial").val(),
+            paciente: $("#txtPaciente").val(),
         }, function (respuesta) {
             if (esEdicion) {
                 MensajesService.pop("Has actualizado un registro de bitácora.")
@@ -999,9 +1011,11 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Mensajes
         ])
     })
 })
-app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaBitacoraComponent, BusquedaBitacoraComponent) {
+app.controller("bitacoraCtrl", function ($scope, $http, SesionService, BitacoraMediator, ListaBitacoraComponent, BusquedaBitacoraComponent) {
     // Inicializar variables del scope
     $scope.mesSeleccionado = ""
+    $scope.esAdmin = (SesionService.getTipo && SesionService.getTipo() == 1)
+    $scope.pacienteFiltro = $scope.esAdmin ? "" : (SesionService.getUsr ? (SesionService.getUsr() || "") : "")
 
     // Registrar componentes en el Mediator
     BitacoraMediator.register('lista', ListaBitacoraComponent)
@@ -1061,8 +1075,13 @@ app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaB
         BitacoraMediator.broadcast('mes_seleccionado', { mes: $scope.mesSeleccionado })
         
         // Preparar parámetros de búsqueda solo con mes
+        if (!$scope.esAdmin && !$scope.pacienteFiltro) {
+            $scope.pacienteFiltro = SesionService.getUsr ? (SesionService.getUsr() || "") : ""
+        }
+
         const params = {
-            mes: $scope.mesSeleccionado
+            mes: $scope.mesSeleccionado,
+            paciente: $scope.pacienteFiltro || ""
         }
         
         $.get("bitacora/buscar", params, function (registro) {
@@ -1087,6 +1106,7 @@ app.controller("bitacoraCtrl", function ($scope, $http, BitacoraMediator, ListaB
                                     <h5 class="card-title mb-0">Registro #${item.idBitacora}</h5>
                                 </div>
                                 <div class="card-body">
+                                    <p class="card-text"><strong>Paciente:</strong> ${item.paciente || 'N/A'}</p>
                                     <p class="card-text"><strong>Fecha:</strong> ${item.fecha || 'N/A'}</p>
                                     <p class="card-text"><strong>Hora Inicio:</strong> ${item.horaInicio || 'N/A'}</p>
                                     <p class="card-text"><strong>Hora Fin:</strong> ${item.horaFin || 'N/A'}</p>

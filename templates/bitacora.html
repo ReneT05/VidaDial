@@ -1,6 +1,6 @@
 <div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-md-4 offset-md-4">
+    <div class="row mb-4 justify-content-center">
+        <div class="col-md-4">
             <label for="selectMes" class="form-label">Seleccionar Mes:</label>
             <select id="selectMes" class="form-select" ng-model="mesSeleccionado" ng-change="buscarBitacora()">
                 <option value="">Seleccione un mes</option>
@@ -17,6 +17,16 @@
                 <option value="11">Noviembre</option>
                 <option value="12">Diciembre</option>
             </select>
+        </div>
+        <div class="col-md-4">
+            <label for="txtPacienteFiltro" class="form-label">Paciente:</label>
+            <input type="text"
+                   id="txtPacienteFiltro"
+                   class="form-control"
+                   placeholder="Nombre del paciente"
+                   ng-model="pacienteFiltro"
+                   ng-change="buscarBitacora()"
+                   ng-disabled="!esAdmin">
         </div>
     </div>
     
