@@ -1,9 +1,9 @@
-<div class="input-group mb-3">
-    <div class="row w-100">
-        <div class="col-md-3">
-            <label for="selectMes" class="form-label">Mes:</label>
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-4 offset-md-4">
+            <label for="selectMes" class="form-label">Seleccionar Mes:</label>
             <select id="selectMes" class="form-select" ng-model="mesSeleccionado" ng-change="buscarBitacora()">
-                <option value="">Todos los meses</option>
+                <option value="">Seleccione un mes</option>
                 <option value="1">Enero</option>
                 <option value="2">Febrero</option>
                 <option value="3">Marzo</option>
@@ -18,46 +18,11 @@
                 <option value="12">Diciembre</option>
             </select>
         </div>
-        <div class="col-md-3">
-            <label for="selectAño" class="form-label">Año:</label>
-            <select id="selectAño" class="form-select" ng-model="añoSeleccionado" ng-change="buscarBitacora()">
-                <option value="">Todos los años</option>
-                <option ng-repeat="año in añosDisponibles" value="{{año}}">{{año}}</option>
-            </select>
-        </div>
-        <div class="col-md-6">
-            <label for="busquedaTexto" class="form-label">Búsqueda por texto:</label>
-            <input type="text" id="busquedaTexto" class="form-control" ng-model="busquedaTexto" 
-                   placeholder="Buscar por ID, fecha o glucosa..." ng-change="buscarBitacora()">
-        </div>
+    </div>
+    
+    <div id="contenedorTarjetas" class="row justify-content-center">
+        <!-- Las tarjetas se insertarán aquí dinámicamente -->
     </div>
 </div>
-<div class="input-group">
-    <input type="text" id="tablabitacora" name="tablabitacora" class="form-control text-end"
-        style="border: none !important;" ng-model="tablabitacora" readonly>
-    <span>&nbsp;registro(s)</span>
-    <div class="table-responsive">
-        <table class="table table-sm">
-            <thead class="table-active">
-            <tr>
-                <th>ID</th>
-                <th>Fecha</th>
-                <th>Hora Inicio</th>
-                <th>Hora Fin</th>
-                <th>Drenaje Inicial</th>
-                <th>UF Total</th>
-                <th>Tiempo Medio Permanencia</th>
-                <th>Líquido Ingerido</th>
-                <th>Cantidad Orina</th>
-                <th>Glucosa</th>
-                <th>Presión Arterial</th>
-                <th>Fecha Creación</th>
-                <th>Fecha Actualización</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody id="tbodyBitacora"></tbody>
-        </table>
-    </div>
 
-    <div class="div-to-complete-screen"></div>
+<div class="div-to-complete-screen"></div>

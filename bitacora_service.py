@@ -62,28 +62,26 @@ class BitacoraSearchStrategy(ABC):
 class BitacoraSearchByMonth(BitacoraSearchStrategy):
     """
     Estrategia de búsqueda por mes específico.
-    Filtra los registros de bitácora por el mes y año proporcionados.
+    Filtra los registros de bitácora por el mes proporcionado (en cualquier año).
     """
 
     def search(self, connection, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Busca registros de bitácora por mes y año."""
+        """Busca registros de bitácora por mes (en cualquier año)."""
         mes = params.get('mes')
-        año = params.get('año')
         
-        if not mes or not año:
+        if not mes:
             return []
 
         try:
             cursor = connection.cursor(dictionary=True)
-            # Formato de fecha esperado: YYYY-MM-DD
-            # Buscamos registros donde el mes y año coincidan
+            # Buscamos registros donde el mes coincida (sin importar el año)
             sql = """
             SELECT *
             FROM bitacora
-            WHERE YEAR(fecha) = %s AND MONTH(fecha) = %s
+            WHERE MONTH(fecha) = %s
             ORDER BY idBitacora DESC;
             """
-            val = (año, mes)
+            val = (mes,)
             
             cursor.execute(sql, val)
             registros = cursor.fetchall()
@@ -198,26 +196,18 @@ class BitacoraSearchFactory:
         
         Args:
             params: Diccionario con los parámetros de búsqueda
-                   - 'mes': mes a buscar (opcional)
-                   - 'año': año a buscar (opcional)
-                   - 'busqueda': texto a buscar (opcional)
+                   - 'mes': mes a buscar (requerido)
         
         Returns:
             Instancia de la estrategia de búsqueda apropiada
         """
         mes = params.get('mes')
-        año = params.get('año')
-        busqueda = params.get('busqueda', '').strip()
         
-        # Si hay mes y año, y también hay texto de búsqueda
-        if mes and año and busqueda:
-            return BitacoraSearchByMonthAndText()
-        
-        # Si solo hay mes y año
-        elif mes and año:
+        # Si hay mes, buscar por mes
+        if mes:
             return BitacoraSearchByMonth()
         
-        # Si solo hay texto de búsqueda o no hay parámetros
+        # Si no hay mes, retornar búsqueda vacía
         else:
             return BitacoraSearchByText()
 

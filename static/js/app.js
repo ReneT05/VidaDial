@@ -816,37 +816,34 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Categori
 app.controller("bitacoraCtrl", function ($scope, $http) {
     // Inicializar variables del scope
     $scope.mesSeleccionado = ""
-    $scope.añoSeleccionado = ""
-    $scope.busquedaTexto = ""
 
-    // Inicializar años disponibles (últimos 10 años y próximos 2)
-    const añoActual = new Date().getFullYear()
-    $scope.añosDisponibles = []
-    for (let i = añoActual - 10; i <= añoActual + 2; i++) {
-        $scope.añosDisponibles.push(i)
+    // Función para obtener el nombre del mes
+    function obtenerNombreMes(numeroMes) {
+        const meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+        return meses[parseInt(numeroMes)] || ""
     }
 
-    // Función para buscar bitácora con los parámetros seleccionados
+    // Función para buscar bitácora solo por mes
     $scope.buscarBitacora = function() {
-        $("#tbodyBitacora").html(`<tr>
-            <th colspan="14" class="text-center">
+        // Si no hay mes seleccionado, mostrar vacío
+        if (!$scope.mesSeleccionado) {
+            $("#contenedorTarjetas").html("")
+            return
+        }
+
+        // Mostrar spinner de carga
+        $("#contenedorTarjetas").html(`
+            <div class="col-12 text-center">
                 <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
                     <span class="visually-hidden">Cargando...</span>
                 </div>
-            </th>
-        </tr>`)
+            </div>
+        `)
         
-        // Preparar parámetros de búsqueda
+        // Preparar parámetros de búsqueda solo con mes
         const params = {
-            busqueda: $scope.busquedaTexto || ""
-        }
-        
-        // Agregar mes y año si están seleccionados
-        if ($scope.mesSeleccionado) {
-            params.mes = $scope.mesSeleccionado
-        }
-        if ($scope.añoSeleccionado) {
-            params.año = $scope.añoSeleccionado
+            mes: $scope.mesSeleccionado
         }
         
         $.get("bitacora/buscar", params, function (registro) {
@@ -854,36 +851,47 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
             $scope.$apply(function() {
                 $scope.bitacora = registro.length
             })
-            $("#tbodyBitacora").html("")
             
-            if (registro.length === 0) {
-                $("#tbodyBitacora").html(`<tr>
-                    <td colspan="14" class="text-center">No se encontraron registros</td>
-                </tr>`)
-            } else {
+            // Limpiar contenedor
+            $("#contenedorTarjetas").html("")
+            
+            // Si hay registros, mostrarlos como tarjetas
+            if (registro.length > 0) {
                 for (let x in registro) {
                     const item = registro[x]
-
-                    $("#tbodyBitacora").append(`<tr>
-                        <td>${item.idBitacora}</td>
-                        <td>${item.fecha}</td>
-                        <td>${item.horaInicio}</td>
-                        <td>${item.horaFin}</td>
-                        <td>${item.drenajeInicial}</td>
-                        <td>${item.ufTotal}</td>
-                        <td>${item.tiempoMedioPerm}</td>
-                        <td>${item.liquidoIngerido}</td>
-                        <td>${item.cantidadOrina}</td>                   
-                        <td>${item.glucosa}</td>
-                        <td>${item.presionArterial}</td>
-                        <td>${item.fechaCreacion}</td>
-                        <td>${item.fechaActualizacion}</td>
-                        <td>
-                            <button class="btn btn-danger btn-eliminar while-waiting" data-id="${item.idBitacora}">Eliminar</button><br>
-                        </td>
-                    </tr>`)
+                    const nombreMes = obtenerNombreMes($scope.mesSeleccionado)
+                    
+                    const tarjeta = `
+                        <div class="col-md-4 mb-4">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="card-title mb-0">Registro #${item.idBitacora}</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text"><strong>Fecha:</strong> ${item.fecha || 'N/A'}</p>
+                                    <p class="card-text"><strong>Hora Inicio:</strong> ${item.horaInicio || 'N/A'}</p>
+                                    <p class="card-text"><strong>Hora Fin:</strong> ${item.horaFin || 'N/A'}</p>
+                                    <hr>
+                                    <p class="card-text"><strong>Drenaje Inicial:</strong> ${item.drenajeInicial || 'N/A'}</p>
+                                    <p class="card-text"><strong>UF Total:</strong> ${item.ufTotal || 'N/A'}</p>
+                                    <p class="card-text"><strong>Tiempo Medio Permanencia:</strong> ${item.tiempoMedioPerm || 'N/A'}</p>
+                                    <p class="card-text"><strong>Líquido Ingerido:</strong> ${item.liquidoIngerido || 'N/A'}</p>
+                                    <p class="card-text"><strong>Cantidad Orina:</strong> ${item.cantidadOrina || 'N/A'}</p>
+                                    <p class="card-text"><strong>Glucosa:</strong> ${item.glucosa || 'N/A'}</p>
+                                    <p class="card-text"><strong>Presión Arterial:</strong> ${item.presionArterial || 'N/A'}</p>
+                                </div>
+                                <div class="card-footer bg-light">
+                                    <button class="btn btn-danger btn-sm btn-eliminar while-waiting" data-id="${item.idBitacora}">
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `
+                    $("#contenedorTarjetas").append(tarjeta)
                 }
             }
+            // Si no hay registros, no mostrar nada (vacío)
         })
         disableAll()
     }
@@ -892,9 +900,6 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
     function buscarBitacora() {
         $scope.buscarBitacora()
     }
-
-    // Cargar datos iniciales
-    buscarBitacora()
 
 
     $scope.$watch("bitacora", function (newVal, oldVal) {

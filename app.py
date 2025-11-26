@@ -340,15 +340,11 @@ def eliminarProducto():
 @login
 def buscarBitacora():
     args = request.args
-    busqueda = args.get("busqueda", "").strip()
     mes = args.get("mes", "").strip()
-    año = args.get("año", "").strip()
 
-    # Preparar parámetros para el Factory
+    # Preparar parámetros para el Factory (solo mes)
     params = {
-        "busqueda": busqueda,
-        "mes": int(mes) if mes and mes.isdigit() else None,
-        "año": int(año) if año and año.isdigit() else None
+        "mes": int(mes) if mes and mes.isdigit() else None
     }
 
     # Usar el Factory para obtener la estrategia de búsqueda apropiada
