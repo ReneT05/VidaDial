@@ -836,6 +836,7 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
                     <td>${item.fecha}</td>
                     <td>${item.horaInicio}</td>
                     <td>${item.horaFin}</td>
+                    <td>${item.drenajeInicial}</td>
                     <td>${item.ufTotal}</td>
                     <td>${item.tiempoMedioPerm}</td>
                     <td>${item.liquidoIngerido}</td>
