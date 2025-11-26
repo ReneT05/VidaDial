@@ -362,6 +362,108 @@ class BitacoraCountDecorator(BitacoraDecorator):
 
 
 # ============================================================================
+# PATRÓN OBSERVER
+# ============================================================================
+
+class BitacoraObserver(ABC):
+    """
+    Interfaz abstracta para los observadores de bitácora.
+    Patrón Observer para notificar cambios en los registros.
+    """
+    
+    @abstractmethod
+    def update(self, event_type: str, data: Dict[str, Any]):
+        """
+        Se llama cuando ocurre un evento en la bitácora.
+        
+        Args:
+            event_type: Tipo de evento ('created', 'updated', 'deleted')
+            data: Datos del evento (contiene 'id' y posiblemente 'datos')
+        """
+        pass
+
+
+class BitacoraSubject:
+    """
+    Sujeto observable que notifica a los observadores cuando ocurren eventos.
+    Mantiene una lista de observadores y los notifica cuando hay cambios.
+    """
+    
+    def __init__(self):
+        self._observers: List[BitacoraObserver] = []
+    
+    def attach(self, observer: BitacoraObserver):
+        """
+        Agrega un observador a la lista.
+        
+        Args:
+            observer: Instancia de un observador
+        """
+        if observer not in self._observers:
+            self._observers.append(observer)
+    
+    def detach(self, observer: BitacoraObserver):
+        """
+        Elimina un observador de la lista.
+        
+        Args:
+            observer: Instancia del observador a eliminar
+        """
+        if observer in self._observers:
+            self._observers.remove(observer)
+    
+    def notify(self, event_type: str, data: Dict[str, Any]):
+        """
+        Notifica a todos los observadores sobre un evento.
+        
+        Args:
+            event_type: Tipo de evento ('created', 'updated', 'deleted')
+            data: Datos del evento
+        """
+        for observer in self._observers:
+            try:
+                observer.update(event_type, data)
+            except Exception as e:
+                # No fallar si un observador tiene error
+                print(f"Error en observador: {e}")
+
+
+class BitacoraLogObserver(BitacoraObserver):
+    """
+    Observador concreto que registra eventos en un log.
+    Implementa el patrón Observer para logging de eventos.
+    """
+    
+    def update(self, event_type: str, data: Dict[str, Any]):
+        """Registra el evento en el log."""
+        registro_id = data.get('id', 'N/A')
+        mensaje = f"[BITACORA LOG] Evento: {event_type.upper()}, Registro ID: {registro_id}"
+        print(mensaje)
+
+
+class BitacoraNotificationObserver(BitacoraObserver):
+    """
+    Observador concreto que envía notificaciones sobre eventos.
+    Puede extenderse para integrar con sistemas de notificaciones.
+    """
+    
+    def update(self, event_type: str, data: Dict[str, Any]):
+        """Envía una notificación sobre el evento."""
+        registro_id = data.get('id', 'N/A')
+        
+        if event_type == 'created':
+            mensaje = f"Notificación: Nuevo registro de bitácora creado (ID: {registro_id})"
+        elif event_type == 'updated':
+            mensaje = f"Notificación: Registro de bitácora actualizado (ID: {registro_id})"
+        elif event_type == 'deleted':
+            mensaje = f"Notificación: Registro de bitácora eliminado (ID: {registro_id})"
+        else:
+            mensaje = f"Notificación: Evento desconocido '{event_type}' en registro (ID: {registro_id})"
+        
+        print(mensaje)
+
+
+# ============================================================================
 # PATRÓN FACADE
 # ============================================================================
 
