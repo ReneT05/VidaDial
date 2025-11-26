@@ -344,7 +344,7 @@ app.config(function ($routeProvider, $locationProvider, $provide) {
         templateUrl: "login",
         controller: "loginCtrl"
     })
-    .when("/productos", {
+    .when("/registro", {
         templateUrl: "productos",
         controller: "productosCtrl"
     })
@@ -363,7 +363,7 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
     $rootScope.incompleteRequest = false
     $rootScope.completeRequest   = false
     $rootScope.login             = localStorage.getItem("flask-login")
-    const defaultRouteAuth       = "#/productos"
+    const defaultRouteAuth       = "#/registro"
     let timesChangesSuccessRoute = 0
 
 
@@ -516,16 +516,16 @@ app.run(["$rootScope", "$location", "$timeout", "SesionService", function($rootS
 
 
             // swipe
-            if (path.indexOf("productos") != -1) {
+            if (path.indexOf("registro") != -1) {
                 $rootScope.leftView      = ""
                 $rootScope.rightView     = "Ventas"
                 $rootScope.leftViewLink  = ""
                 $rootScope.rightViewLink = "#/ventas"
             }
             else if (path.indexOf("ventas") != -1) {
-                $rootScope.leftView      = "Productos"
+                $rootScope.leftView      = "Registro"
                 $rootScope.rightView     = "Notificaciones"
-                $rootScope.leftViewLink  = "#/productos"
+                $rootScope.leftViewLink  = "#/registro"
                 $rootScope.rightViewLink = "#/notificaciones"
             }
             else {
@@ -1171,7 +1171,7 @@ app.controller("bitacoraCtrl", function ($scope, $http, SesionService, BitacoraM
         $.get(`bitacora/${id}`, function(registro) {
             BitacoraMediator.send('formulario', 'cargar_para_editar', { registro: registro })
             // Cambiar a la ruta de productos para mostrar el formulario
-            window.location.hash = "#/productos"
+            window.location.hash = "#/registro"
         })
     })
 
