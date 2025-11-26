@@ -435,42 +435,112 @@ class BitacoraFacade:
             if con and con.is_connected():
                 con.close()
     
-    def guardar_registro(self, datos: Dict[str, Any]) -> Dict[str, Any]:
+    def obtener_registro(self, id_bitacora: int) -> Dict[str, Any]:
         """
-        Guarda un nuevo registro en la bitácora.
+        Obtiene un registro de bitácora por su ID.
         
         Args:
-            datos: Diccionario con los datos del registro
+            id_bitacora: ID del registro a obtener
+        
+        Returns:
+            Diccionario con el registro o error
+        """
+        con = None
+        try:
+            con = self.connection_singleton.get_connection()
+            cursor = con.cursor(dictionary=True)
+            
+            sql = "SELECT * FROM bitacora WHERE idBitacora = %s"
+            val = (id_bitacora,)
+            
+            cursor.execute(sql, val)
+            registro = cursor.fetchone()
+            
+            if cursor:
+                cursor.close()
+            
+            if registro:
+                return {
+                    'success': True,
+                    'registro': registro
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Registro no encontrado'
+                }
+            
+        except Exception as error:
+            return {
+                'success': False,
+                'error': str(error),
+                'message': 'Error al obtener el registro'
+            }
+        finally:
+            if con and con.is_connected():
+                con.close()
+    
+    def guardar_registro(self, datos: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Guarda un nuevo registro o actualiza uno existente en la bitácora.
+        
+        Args:
+            datos: Diccionario con los datos del registro (debe incluir 'id' si es actualización)
         
         Returns:
             Diccionario con el resultado de la operación
         """
+        id_bitacora = datos.get('id')
         con = None
         try:
             con = self.connection_singleton.get_connection()
             cursor = con.cursor()
             
-            sql = """
-            INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
-                                 tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            val = (
-                datos.get('fecha'),
-                datos.get('horaInicio'),
-                datos.get('horaFin'),
-                datos.get('drenajeInicial'),
-                datos.get('ufTotal'),
-                datos.get('tiempoMedioPerm'),
-                datos.get('liquidoIngerido'),
-                datos.get('cantidadOrina'),
-                datos.get('glucosa'),
-                datos.get('presionArterial')
-            )
+            if id_bitacora:
+                # Actualizar registro existente
+                sql = """
+                UPDATE bitacora 
+                SET fecha = %s, horaInicio = %s, horaFin = %s, drenajeInicial = %s, 
+                    ufTotal = %s, tiempoMedioPerm = %s, liquidoIngerido = %s, 
+                    cantidadOrina = %s, glucosa = %s, presionArterial = %s
+                WHERE idBitacora = %s
+                """
+                val = (
+                    datos.get('fecha'),
+                    datos.get('horaInicio'),
+                    datos.get('horaFin'),
+                    datos.get('drenajeInicial'),
+                    datos.get('ufTotal'),
+                    datos.get('tiempoMedioPerm'),
+                    datos.get('liquidoIngerido'),
+                    datos.get('cantidadOrina'),
+                    datos.get('glucosa'),
+                    datos.get('presionArterial'),
+                    id_bitacora
+                )
+            else:
+                # Insertar nuevo registro
+                sql = """
+                INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
+                                     tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                val = (
+                    datos.get('fecha'),
+                    datos.get('horaInicio'),
+                    datos.get('horaFin'),
+                    datos.get('drenajeInicial'),
+                    datos.get('ufTotal'),
+                    datos.get('tiempoMedioPerm'),
+                    datos.get('liquidoIngerido'),
+                    datos.get('cantidadOrina'),
+                    datos.get('glucosa'),
+                    datos.get('presionArterial')
+                )
             
             cursor.execute(sql, val)
             con.commit()
-            registro_id = cursor.lastrowid
+            registro_id = id_bitacora if id_bitacora else cursor.lastrowid
             
             if cursor:
                 cursor.close()
@@ -478,7 +548,7 @@ class BitacoraFacade:
             return {
                 'success': True,
                 'id': registro_id,
-                'message': 'Registro guardado exitosamente'
+                'message': 'Registro guardado exitosamente' if not id_bitacora else 'Registro actualizado exitosamente'
             }
             
         except Exception as error:

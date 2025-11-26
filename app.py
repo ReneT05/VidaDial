@@ -368,10 +368,23 @@ def buscarBitacora():
     # El frontend puede acceder a resultado['registros'] o usar resultado completo
     return make_response(jsonify(resultado.get('registros', [])))
 
+@app.route("/bitacora/<int:id>", methods=["GET"])
+@login
+def obtenerBitacora(id):
+    """Obtiene un registro de bitácora por su ID."""
+    resultado = bitacora_facade.obtener_registro(id)
+    
+    if resultado.get('success'):
+        return make_response(jsonify(resultado.get('registro')))
+    else:
+        return make_response(jsonify({"error": resultado.get('error', 'Registro no encontrado')}), 404)
+
 @app.route("/bitacora", methods=["POST"])
 @login
 def guardarBitacora():
     # Recopilar datos del formulario
+    id_bitacora = request.form.get("id", "").strip()
+    
     datos = {
         "fecha": request.form.get("fecha", "").strip(),
         "horaInicio": request.form.get("horaInicio", "").strip() or None,
@@ -384,6 +397,10 @@ def guardarBitacora():
         "glucosa": None,
         "presionArterial": request.form.get("presionArterial", "").strip() or None
     }
+
+    # Agregar ID si existe (para actualización)
+    if id_bitacora and id_bitacora.isdigit():
+        datos["id"] = int(id_bitacora)
 
     # Convertir valores vacíos a None para campos numéricos
     campos_numericos = ['drenajeInicial', 'ufTotal', 'tiempoMedioPerm', 

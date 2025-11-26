@@ -660,85 +660,61 @@ app.controller("loginCtrl", function ($scope, $http, $rootScope) {
         disableAll()
     })
 })
-app.controller("productosCtrl", function ($scope, $http, SesionService, CategoriaFactory, MensajesService, RecetaFacade) {
-    function buscarProductos() {
-        $("#tbodyProductos").html(`<tr>
-            <th colspan="5" class="text-center">
-                <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-            </th>
-        </tr>`)
-        $.get("productos/buscar", {
-            busqueda: ""
-        }, function (productos) {
-            enableAll()
-            $("#tbodyProductos").html("")
-            for (let x in productos) {
-                const producto = productos[x]
-
-                $("#tbodyProductos").append(`<tr>
-                    <td>${producto.Id_Producto}</td>
-                    <td>${producto.Nombre_Producto}</td>
-                    <td>${producto.Precio}</td>
-                    <td>${producto.Existencias || ''}</td>
-                    <td>
-                        ${
-                            (producto.Existencias == null)
-                            ? `<button class="btn btn-info btn-ingredientes me-1 mb-1 while-waiting" data-id="${producto.Id_Producto}">Ver ingredientes...</button><br>`
-                            : ""
-                        }
-                        <button class="btn btn-danger btn-eliminar while-waiting" data-id="${producto.Id_Producto}">Eliminar</button><br>
-                    </td>
-                </tr>`)
-            }
-        })
-        disableAll()
-    }
-
-    buscarProductos()
-
-
-    $scope.$watch("busqueda", function(newVal, oldVal) {
-        if (newVal != oldVal) {
-            $.get("log", {
-                actividad: "Búsqueda de productos",
-                descripcion: `Se realizo una búsqueda de productos "${newVal}"`
-            })
-        }
-    })
-
+app.controller("productosCtrl", function ($scope, $http, SesionService, MensajesService) {
     $scope.SesionService = SesionService
 
-    $.get("productos/categoria", {
-        categoria: "Galletas"
-    }, function (galletas) {
-        const categoriaGalletas = CategoriaFactory.create("Galletas", galletas)
-        console.log("Galletas Factory", categoriaGalletas.getInfo())
-        $scope.categoriaGalletas = categoriaGalletas
+    // Función para limpiar el formulario
+    function limpiarFormulario() {
+        $("#txtIdBitacora").val("")
+        $("#frmBitacora")[0].reset()
+        $("#btnGuardar").text("Guardar Registro")
+        $("#btnGuardar").removeClass("btn-warning").addClass("btn-primary")
+    }
+
+    // Botón limpiar
+    $("#btnLimpiar")
+    .off("click")
+    .click(function() {
+        limpiarFormulario()
     })
-    $.get("productos/categoria", {
-        categoria: "Refrescos"
-    }, function (refrescos) {
-        const categoriaRefrescos = CategoriaFactory.create("Refrescos", refrescos)
-        console.log("Refrescos Factory", categoriaRefrescos.getInfo())
-        $scope.categoriaRefrescos = categoriaRefrescos
-    })
 
+    // Función para cargar registro en el formulario para editar
+    function cargarRegistroParaEditar(idBitacora) {
+        $.get(`bitacora/${idBitacora}`, function(registro) {
+            $("#txtIdBitacora").val(registro.idBitacora)
+            $("#txtFecha").val(registro.fecha)
+            $("#txtHoraInicio").val(registro.horaInicio || "")
+            $("#txtHoraFin").val(registro.horaFin || "")
+            $("#txtDrenajeInicial").val(registro.drenajeInicial || "")
+            $("#txtUfTotal").val(registro.ufTotal || "")
+            $("#txtTiempoMedioPerm").val(registro.tiempoMedioPerm || "")
+            $("#txtLiquidoIngerido").val(registro.liquidoIngerido || "")
+            $("#txtCantidadOrina").val(registro.cantidadOrina || "")
+            $("#txtGlucosa").val(registro.glucosa || "")
+            $("#txtPresionArterial").val(registro.presionArterial || "")
+            
+            // Cambiar texto del botón
+            $("#btnGuardar").text("Actualizar Registro")
+            $("#btnGuardar").removeClass("btn-primary").addClass("btn-warning")
+            
+            // Scroll al formulario
+            $('html, body').animate({
+                scrollTop: $("#frmBitacora").offset().top - 100
+            }, 500)
+        })
+    }
 
-    Pusher.logToConsole = true
-
-    const pusher = new Pusher("12cb9c6b5319b2989000", {
-        cluster: "us2"
-    })
-    const channel = pusher.subscribe("canalProductos")
-
+    // Submit del formulario
     $("#frmBitacora")
     .off("submit")
     .submit(function (event) {
         event.preventDefault()
 
+        const idBitacora = $("#txtIdBitacora").val()
+        const esEdicion = idBitacora && idBitacora !== ""
+
         $.post("bitacora", {
+            id: idBitacora,
             fecha: $("#txtFecha").val(),
             horaInicio: $("#txtHoraInicio").val(),
             horaFin: $("#txtHoraFin").val(),
@@ -750,9 +726,13 @@ app.controller("productosCtrl", function ($scope, $http, SesionService, Categori
             glucosa: $("#txtGlucosa").val(),
             presionArterial: $("#txtPresionArterial").val(),
         }, function (respuesta) {
-            MensajesService.pop("Has agregado un registro de bitácora.")
+            if (esEdicion) {
+                MensajesService.pop("Has actualizado un registro de bitácora.")
+            } else {
+                MensajesService.pop("Has agregado un registro de bitácora.")
+            }
             // Limpiar el formulario
-            $("#frmBitacora")[0].reset()
+            limpiarFormulario()
             enableAll()
         })
         disableAll()
@@ -889,7 +869,10 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
                                     <p class="card-text"><strong>Presión Arterial:</strong> ${item.presionArterial || 'N/A'}</p>
                                 </div>
                                 <div class="card-footer bg-light">
-                                    <button class="btn btn-danger btn-sm btn-eliminar while-waiting" data-id="${item.idBitacora}">
+                                    <button class="btn btn-warning btn-sm btn-editar-bitacora me-1 while-waiting" data-id="${item.idBitacora}">
+                                        Editar
+                                    </button>
+                                    <button class="btn btn-danger btn-sm btn-eliminar-bitacora while-waiting" data-id="${item.idBitacora}">
                                         Eliminar
                                     </button>
                                 </div>
@@ -920,8 +903,18 @@ app.controller("bitacoraCtrl", function ($scope, $http) {
     })
 
 
-    $(document).off("click", ".btn-eliminar")
-    $(document).on("click", ".btn-eliminar", function (event) {
+    // Botón editar (desde bitácora)
+    $(document).off("click", ".btn-editar-bitacora")
+    $(document).on("click", ".btn-editar-bitacora", function (event) {
+        const id = $(this).data("id")
+        if (window.cargarRegistroParaEditar) {
+            window.cargarRegistroParaEditar(id)
+        }
+    })
+
+    // Botón eliminar (desde bitácora)
+    $(document).off("click", ".btn-eliminar-bitacora")
+    $(document).on("click", ".btn-eliminar-bitacora", function (event) {
         const id = $(this).data("id")
 
         modal("Eliminar este Registro?", 'Confirmaci&oacute;n', [

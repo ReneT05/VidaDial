@@ -8,6 +8,7 @@
     </div>
 </div>
 <form id="frmBitacora" method="post">
+    <input type="hidden" id="txtIdBitacora" name="txtIdBitacora" value="">
     <div class="row">
         <div class="col-md-6">
             <div class="mb-1">
@@ -55,69 +56,9 @@
         </div>
     </div>
     <div class="mb-1 text-end">
-        <button type="submit" class="btn btn-primary while-waiting">Guardar Registro</button>
+        <button type="button" class="btn btn-secondary me-2 while-waiting" id="btnLimpiar">Limpiar Campos</button>
+        <button type="submit" class="btn btn-primary while-waiting" id="btnGuardar">Guardar Registro</button>
     </div>
 </form>
-<div class="mb-1">
-    <input type="text" id="txtBusqueda" name="txtBusqueda" class="form-control" ng-model="busqueda">
-</div>
-<div class="form-check">
-    <input class="form-check-input" type="checkbox" value="" id="chkActualizarAutoTbodyProductos">
-    <label class="form-check-label" for="chkActualizarAutoTbodyProductos">
-        Actualizar cuando haya cambios
-    </label>
-</div>
-
-
-<div class="row">
-    <div class="col-12 col-sm-12 col-lg-12 col-xl-6 col-xxl-6">
-        <div class="shadow shadow-lg p-3 mb-2">
-            <h5>{{ "{{ categoriaGalletas.titulo }}" }}</h5>
-            <div class="row">
-                <div class="col-12 col-sm-6 col-md-6 col-lg-4 col-xl-3 col-xxl-3" ng-repeat="producto in categoriaGalletas.productos">
-                    <div class="card text-bg-info mb-3">
-                        <div class="card-header">Producto</div>
-                        <div class="card-body">
-                            <h5 class="card-title">{{ "{{ producto.Nombre_Producto }}" }}</h5>
-                            <p class="card-text"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-sm-12 col-lg-12 col-xl-6 col-xxl-6">
-        <div class="shadow shadow-lg p-3 mb-2">
-            <h5>{{ "{{ categoriaRefrescos.titulo }}" }}</h5>
-            <div class="row">
-                <div class="col-12 col-sm-6 col-md-6 col-lg-4 col-xl-3 col-xxl-3" ng-repeat="producto in categoriaRefrescos.productos">
-                    <div class="card text-bg-warning mb-3">
-                        <div class="card-header">Producto</div>
-                        <div class="card-body">
-                            <h5 class="card-title">{{ "{{ producto.Nombre_Producto }}" }}</h5>
-                            <p class="card-text"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<div class="table-responsive">
-    <table class="table table-sm">
-        <thead class="table-active">
-            <tr>
-                <th>Id</th>
-                <th>Nombre</th>
-                <th>Precio</th>
-                <th>Existencias</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody id="tbodyProductos"></tbody>
-    </table>
-</div>
 
 <div class="div-to-complete-screen"></div>
