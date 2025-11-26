@@ -1,10 +1,11 @@
 """
-Módulo que implementa los patrones Singleton y Factory para el servicio de bitácora.
+Módulo que implementa los patrones Singleton, Factory, Facade y Decorator para el servicio de bitácora.
 """
 
 import mysql.connector
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
+from datetime import datetime
 
 
 class BitacoraConnectionSingleton:
@@ -210,4 +211,328 @@ class BitacoraSearchFactory:
         # Si no hay mes, retornar búsqueda vacía
         else:
             return BitacoraSearchByText()
+
+
+# ============================================================================
+# PATRÓN DECORATOR
+# ============================================================================
+
+class BitacoraDecorator(ABC):
+    """
+    Clase base abstracta para los decoradores de bitácora.
+    Patrón Decorator para agregar funcionalidades adicionales.
+    """
+    
+    def __init__(self, component):
+        self._component = component
+    
+    @abstractmethod
+    def process(self, data: Any) -> Any:
+        """Procesa los datos según la funcionalidad del decorador."""
+        pass
+
+
+class BitacoraValidationDecorator(BitacoraDecorator):
+    """
+    Decorator para validar registros antes de mostrarlos.
+    Valida que los registros tengan los campos requeridos y valores válidos.
+    """
+    
+    def process(self, registros: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Valida y filtra registros inválidos."""
+        # Procesar con el componente anterior si existe
+        if self._component:
+            registros = self._component.process(registros)
+        
+        if not isinstance(registros, list):
+            return []
+        
+        registros_validos = []
+        for registro in registros:
+            if self._validar_registro(registro):
+                registros_validos.append(registro)
+        
+        return registros_validos
+    
+    def _validar_registro(self, registro: Dict[str, Any]) -> bool:
+        """Valida que un registro tenga los campos mínimos requeridos."""
+        # Validar que tenga fecha (campo requerido)
+        if not registro.get('fecha'):
+            return False
+        
+        # Validar que los valores numéricos sean válidos si existen
+        campos_numericos = ['drenajeInicial', 'ufTotal', 'tiempoMedioPerm', 
+                           'liquidoIngerido', 'cantidadOrina', 'glucosa']
+        
+        for campo in campos_numericos:
+            valor = registro.get(campo)
+            if valor is not None:
+                try:
+                    float(valor)
+                except (ValueError, TypeError):
+                    return False
+        
+        return True
+
+
+class BitacoraDateFormatDecorator(BitacoraDecorator):
+    """
+    Decorator para formatear fechas en los registros.
+    Convierte las fechas a un formato legible.
+    """
+    
+    def __init__(self, component, formato_fecha: str = "%d/%m/%Y"):
+        super().__init__(component)
+        self.formato_fecha = formato_fecha
+    
+    def process(self, registros: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Formatea las fechas en los registros."""
+        # Procesar con el componente anterior si existe
+        if self._component:
+            registros = self._component.process(registros)
+        
+        if not isinstance(registros, list):
+            return []
+        
+        registros_formateados = []
+        for registro in registros.copy():
+            registro_formateado = registro.copy()
+            
+            # Formatear fecha
+            if registro_formateado.get('fecha'):
+                try:
+                    fecha_obj = datetime.strptime(str(registro_formateado['fecha']), "%Y-%m-%d")
+                    registro_formateado['fecha_formateada'] = fecha_obj.strftime(self.formato_fecha)
+                except (ValueError, TypeError):
+                    registro_formateado['fecha_formateada'] = registro_formateado['fecha']
+            
+            # Formatear fechaCreacion y fechaActualizacion si existen
+            for campo_fecha in ['fechaCreacion', 'fechaActualizacion']:
+                if registro_formateado.get(campo_fecha):
+                    try:
+                        fecha_obj = datetime.strptime(str(registro_formateado[campo_fecha]), "%Y-%m-%d %H:%M:%S")
+                        registro_formateado[f'{campo_fecha}_formateada'] = fecha_obj.strftime("%d/%m/%Y %H:%M")
+                    except (ValueError, TypeError):
+                        registro_formateado[f'{campo_fecha}_formateada'] = registro_formateado[campo_fecha]
+            
+            registros_formateados.append(registro_formateado)
+        
+        return registros_formateados
+
+
+class BitacoraCountDecorator(BitacoraDecorator):
+    """
+    Decorator para contar registros y agregar metadatos.
+    Agrega información sobre el total de registros.
+    """
+    
+    def process(self, registros: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Agrega el conteo de registros a los resultados."""
+        # Procesar con el componente anterior si existe
+        if self._component:
+            resultado_anterior = self._component.process(registros)
+            # Si el componente anterior devolvió un dict, extraer los registros
+            if isinstance(resultado_anterior, dict):
+                registros = resultado_anterior.get('registros', registros)
+            else:
+                registros = resultado_anterior
+        
+        if not isinstance(registros, list):
+            return {
+                'registros': [],
+                'total': 0,
+                'metadata': {}
+            }
+        
+        total = len(registros)
+        
+        # Calcular estadísticas básicas si hay registros
+        metadata = {}
+        if total > 0:
+            # Contar registros con valores en campos importantes
+            metadata['con_glucosa'] = sum(1 for r in registros if r.get('glucosa') is not None)
+            metadata['con_presion'] = sum(1 for r in registros if r.get('presionArterial') is not None)
+            metadata['con_uf_total'] = sum(1 for r in registros if r.get('ufTotal') is not None)
+        
+        return {
+            'registros': registros,
+            'total': total,
+            'metadata': metadata
+        }
+
+
+# ============================================================================
+# PATRÓN FACADE
+# ============================================================================
+
+class BitacoraFacade:
+    """
+    Patrón Facade para simplificar el acceso a la base de datos y la lógica de bitácora.
+    Proporciona una interfaz simple y unificada para todas las operaciones de bitácora.
+    """
+    
+    def __init__(self, connection_singleton: BitacoraConnectionSingleton):
+        """
+        Inicializa el Facade con el Singleton de conexión.
+        
+        Args:
+            connection_singleton: Instancia del Singleton de conexión
+        """
+        self.connection_singleton = connection_singleton
+        self.decorator_chain = None
+    
+    def set_decorator_chain(self, decorator: BitacoraDecorator):
+        """
+        Establece la cadena de decoradores. El decorador pasado debe ser el último
+        de la cadena, que envuelve a los anteriores.
+        
+        Args:
+            decorator: El último decorador de la cadena
+        """
+        self.decorator_chain = decorator
+    
+    def buscar_por_mes(self, mes: int, aplicar_decoradores: bool = True) -> Dict[str, Any]:
+        """
+        Busca registros de bitácora por mes.
+        
+        Args:
+            mes: Número del mes (1-12)
+            aplicar_decoradores: Si se deben aplicar los decoradores configurados
+        
+        Returns:
+            Diccionario con los registros y metadatos
+        """
+        if not mes or mes < 1 or mes > 12:
+            return {'registros': [], 'total': 0, 'metadata': {}}
+        
+        params = {'mes': mes}
+        search_strategy = BitacoraSearchFactory.create_search_strategy(params)
+        
+        con = None
+        try:
+            con = self.connection_singleton.get_connection()
+            registros = search_strategy.search(con, params)
+            
+            # Aplicar cadena de decoradores si está configurada
+            if aplicar_decoradores and self.decorator_chain:
+                resultado = self.decorator_chain.process(registros)
+                # Si el decorador devolvió un diccionario (como CountDecorator), retornarlo
+                if isinstance(resultado, dict):
+                    return resultado
+                # Si devolvió una lista, crear estructura estándar
+                registros = resultado
+            
+            # Crear estructura estándar
+            return {
+                'registros': registros,
+                'total': len(registros),
+                'metadata': {}
+            }
+            
+        except Exception as error:
+            return {'registros': [], 'total': 0, 'metadata': {'error': str(error)}}
+        finally:
+            if con and con.is_connected():
+                con.close()
+    
+    def guardar_registro(self, datos: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Guarda un nuevo registro en la bitácora.
+        
+        Args:
+            datos: Diccionario con los datos del registro
+        
+        Returns:
+            Diccionario con el resultado de la operación
+        """
+        con = None
+        try:
+            con = self.connection_singleton.get_connection()
+            cursor = con.cursor()
+            
+            sql = """
+            INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
+                                 tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            val = (
+                datos.get('fecha'),
+                datos.get('horaInicio'),
+                datos.get('horaFin'),
+                datos.get('drenajeInicial'),
+                datos.get('ufTotal'),
+                datos.get('tiempoMedioPerm'),
+                datos.get('liquidoIngerido'),
+                datos.get('cantidadOrina'),
+                datos.get('glucosa'),
+                datos.get('presionArterial')
+            )
+            
+            cursor.execute(sql, val)
+            con.commit()
+            registro_id = cursor.lastrowid
+            
+            if cursor:
+                cursor.close()
+            
+            return {
+                'success': True,
+                'id': registro_id,
+                'message': 'Registro guardado exitosamente'
+            }
+            
+        except Exception as error:
+            if con:
+                con.rollback()
+            return {
+                'success': False,
+                'error': str(error),
+                'message': 'Error al guardar el registro'
+            }
+        finally:
+            if con and con.is_connected():
+                con.close()
+    
+    def eliminar_registro(self, id_bitacora: int) -> Dict[str, Any]:
+        """
+        Elimina un registro de la bitácora.
+        
+        Args:
+            id_bitacora: ID del registro a eliminar
+        
+        Returns:
+            Diccionario con el resultado de la operación
+        """
+        con = None
+        try:
+            con = self.connection_singleton.get_connection()
+            cursor = con.cursor()
+            
+            sql = "DELETE FROM bitacora WHERE idBitacora = %s"
+            val = (id_bitacora,)
+            
+            cursor.execute(sql, val)
+            con.commit()
+            filas_afectadas = cursor.rowcount
+            
+            if cursor:
+                cursor.close()
+            
+            return {
+                'success': filas_afectadas > 0,
+                'filas_afectadas': filas_afectadas,
+                'message': 'Registro eliminado exitosamente' if filas_afectadas > 0 else 'Registro no encontrado'
+            }
+            
+        except Exception as error:
+            if con:
+                con.rollback()
+            return {
+                'success': False,
+                'error': str(error),
+                'message': 'Error al eliminar el registro'
+            }
+        finally:
+            if con and con.is_connected():
+                con.close()
 

@@ -14,7 +14,14 @@ import pusher
 import pytz
 import datetime
 
-from bitacora_service import BitacoraConnectionSingleton, BitacoraSearchFactory
+from bitacora_service import (
+    BitacoraConnectionSingleton, 
+    BitacoraSearchFactory,
+    BitacoraFacade,
+    BitacoraValidationDecorator,
+    BitacoraDateFormatDecorator,
+    BitacoraCountDecorator
+)
 
 app            = Flask(__name__)
 app.secret_key = "Test12345"
@@ -41,6 +48,15 @@ con_pool = mysql.connector.pooling.MySQLConnectionPool(
 
 # Inicializar el Singleton para la conexión de bitácora
 bitacora_connection = BitacoraConnectionSingleton.get_instance(con_pool)
+
+# Inicializar el Facade con decoradores
+bitacora_facade = BitacoraFacade(bitacora_connection)
+# Configurar decoradores en cadena: validación -> formateo -> conteo
+# Cada decorador envuelve al anterior (patrón Decorator)
+decorator_validation = BitacoraValidationDecorator(None)
+decorator_date_format = BitacoraDateFormatDecorator(decorator_validation)
+decorator_count = BitacoraCountDecorator(decorator_date_format)
+bitacora_facade.set_decorator_chain(decorator_count)
 
 def pusherProductos():    
     pusher_client = pusher.Pusher(
@@ -342,97 +358,66 @@ def buscarBitacora():
     args = request.args
     mes = args.get("mes", "").strip()
 
-    # Preparar parámetros para el Factory (solo mes)
-    params = {
-        "mes": int(mes) if mes and mes.isdigit() else None
-    }
+    # Convertir mes a entero
+    mes_int = int(mes) if mes and mes.isdigit() else None
 
-    # Usar el Factory para obtener la estrategia de búsqueda apropiada
-    search_strategy = BitacoraSearchFactory.create_search_strategy(params)
+    # Usar el Facade para buscar (simplifica todo el proceso)
+    resultado = bitacora_facade.buscar_por_mes(mes_int, aplicar_decoradores=True)
 
-    # Obtener conexión usando el Singleton
-    con = None
-    try:
-        con = bitacora_connection.get_connection()
-        registros = search_strategy.search(con, params)
-    except Exception as error:
-        registros = []
-    finally:
-        if con and con.is_connected():
-            con.close()
-
-    return make_response(jsonify(registros))
+    # Retornar solo los registros para mantener compatibilidad con el frontend
+    # El frontend puede acceder a resultado['registros'] o usar resultado completo
+    return make_response(jsonify(resultado.get('registros', [])))
 
 @app.route("/bitacora", methods=["POST"])
 @login
 def guardarBitacora():
-    fecha = request.form.get("fecha", "").strip()
-    horaInicio = request.form.get("horaInicio", "").strip()
-    horaFin = request.form.get("horaFin", "").strip()
-    drenajeInicial = request.form.get("drenajeInicial", "").strip()
-    ufTotal = request.form.get("ufTotal", "").strip()
-    tiempoMedioPerm = request.form.get("tiempoMedioPerm", "").strip()
-    liquidoIngerido = request.form.get("liquidoIngerido", "").strip()
-    cantidadOrina = request.form.get("cantidadOrina", "").strip()
-    glucosa = request.form.get("glucosa", "").strip()
-    presionArterial = request.form.get("presionArterial", "").strip()
+    # Recopilar datos del formulario
+    datos = {
+        "fecha": request.form.get("fecha", "").strip(),
+        "horaInicio": request.form.get("horaInicio", "").strip() or None,
+        "horaFin": request.form.get("horaFin", "").strip() or None,
+        "drenajeInicial": None,
+        "ufTotal": None,
+        "tiempoMedioPerm": None,
+        "liquidoIngerido": None,
+        "cantidadOrina": None,
+        "glucosa": None,
+        "presionArterial": request.form.get("presionArterial", "").strip() or None
+    }
 
     # Convertir valores vacíos a None para campos numéricos
-    drenajeInicial = float(drenajeInicial) if drenajeInicial else None
-    ufTotal = float(ufTotal) if ufTotal else None
-    tiempoMedioPerm = float(tiempoMedioPerm) if tiempoMedioPerm else None
-    liquidoIngerido = float(liquidoIngerido) if liquidoIngerido else None
-    cantidadOrina = float(cantidadOrina) if cantidadOrina else None
-    glucosa = float(glucosa) if glucosa else None
+    campos_numericos = ['drenajeInicial', 'ufTotal', 'tiempoMedioPerm', 
+                       'liquidoIngerido', 'cantidadOrina', 'glucosa']
+    
+    for campo in campos_numericos:
+        valor = request.form.get(campo, "").strip()
+        datos[campo] = float(valor) if valor else None
 
-    # Obtener conexión usando el Singleton
-    con = None
-    try:
-        con = bitacora_connection.get_connection()
-        cursor = con.cursor()
+    # Usar el Facade para guardar (simplifica todo el proceso)
+    resultado = bitacora_facade.guardar_registro(datos)
 
-        sql = """
-        INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
-                             tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        val = (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
-               tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial)
-
-        cursor.execute(sql, val)
-        con.commit()
-
-        if cursor:
-            cursor.close()
-
-    except Exception as error:
-        if con:
-            con.rollback()
-        return make_response(jsonify({"error": str(error)}), 400)
-    finally:
-        if con and con.is_connected():
-            con.close()
-
-    return make_response(jsonify({"success": True}))
+    if resultado.get('success'):
+        return make_response(jsonify({"success": True, "id": resultado.get('id')}))
+    else:
+        return make_response(jsonify({"error": resultado.get('error', 'Error desconocido')}), 400)
 
 @app.route("/bitacora/eliminar", methods=["POST"])
+@login
 def eliminarRegistro():
-    id = request.form["id"]
+    id_bitacora = request.form.get("id")
+    
+    if not id_bitacora:
+        return make_response(jsonify({"error": "ID no proporcionado"}), 400)
 
-    con    = con_pool.get_connection()
-    cursor = con.cursor(dictionary=True)
+    try:
+        id_int = int(id_bitacora)
+    except ValueError:
+        return make_response(jsonify({"error": "ID inválido"}), 400)
 
-    sql    = """
-    DELETE FROM bitacora
-    WHERE idBitacora = %s
-    """
-    val    = (id,)
-    cursor.execute(sql, val)
-    con.commit()
+    # Usar el Facade para eliminar (simplifica todo el proceso)
+    resultado = bitacora_facade.eliminar_registro(id_int)
 
-    if cursor:
-        cursor.close()
-    if con and con.is_connected():
-        con.close()
-
-    return make_response(jsonify({}))
+    if resultado.get('success'):
+        return make_response(jsonify({"success": True}))
+    else:
+        return make_response(jsonify({"error": resultado.get('error', 'Error al eliminar')}), 400)
