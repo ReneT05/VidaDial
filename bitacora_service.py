@@ -70,36 +70,40 @@ class BitacoraSearchByMonth(BitacoraSearchStrategy):
         """Busca registros de bitácora por mes (en cualquier año)."""
         mes = params.get('mes')
         id_usuario = params.get('id_usuario')
-        paciente = params.get('paciente')
+        id_paciente = params.get('id_paciente')
         
         if not mes:
             return []
 
         try:
             cursor = connection.cursor(dictionary=True)
-            # Buscamos registros donde el mes coincida filtrando primero por paciente
-            if paciente:
+            # Buscamos registros donde el mes coincida filtrando primero por idPaciente
+            if id_paciente:
                 sql = """
-                SELECT *
-                FROM bitacora
-                WHERE MONTH(fecha) = %s AND paciente = %s
-                ORDER BY idBitacora DESC;
+                SELECT b.*, p.nombreCompleto as paciente
+                FROM bitacora b
+                LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                WHERE MONTH(b.fecha) = %s AND b.idPaciente = %s
+                ORDER BY b.idBitacora DESC;
                 """
-                val = (mes, paciente)
+                val = (mes, id_paciente)
             elif id_usuario is not None:
+                # Buscar por idUsuario a través de la relación con pacientes
                 sql = """
-                SELECT *
-                FROM bitacora
-                WHERE MONTH(fecha) = %s AND idUsuario = %s
-                ORDER BY idBitacora DESC;
+                SELECT b.*, p.nombreCompleto as paciente
+                FROM bitacora b
+                LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                WHERE MONTH(b.fecha) = %s AND p.idUsuario = %s
+                ORDER BY b.idBitacora DESC;
                 """
                 val = (mes, id_usuario)
             else:
                 sql = """
-                SELECT *
-                FROM bitacora
-                WHERE MONTH(fecha) = %s
-                ORDER BY idBitacora DESC;
+                SELECT b.*, p.nombreCompleto as paciente
+                FROM bitacora b
+                LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                WHERE MONTH(b.fecha) = %s
+                ORDER BY b.idBitacora DESC;
                 """
                 val = (mes,)
             
@@ -131,14 +135,15 @@ class BitacoraSearchByText(BitacoraSearchStrategy):
         try:
             cursor = connection.cursor(dictionary=True)
             sql = """
-            SELECT *
-            FROM bitacora
+            SELECT b.*, p.nombreCompleto as paciente
+            FROM bitacora b
+            LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
             WHERE 
-                idBitacora LIKE %s OR
-                fecha LIKE %s OR
-                glucosa LIKE %s OR
-                paciente LIKE %s
-            ORDER BY idBitacora DESC;
+                b.idBitacora LIKE %s OR
+                b.fecha LIKE %s OR
+                b.glucosa LIKE %s OR
+                p.nombreCompleto LIKE %s
+            ORDER BY b.idBitacora DESC;
             """
             val = (busqueda, busqueda, busqueda, busqueda)
             
@@ -562,14 +567,14 @@ class BitacoraFacade:
         self.subject.detach(observer)
     
     def buscar_por_mes(self, mes: int, id_usuario: Optional[int] = None,
-                        paciente: Optional[str] = None, aplicar_decoradores: bool = True) -> Dict[str, Any]:
+                        id_paciente: Optional[int] = None, aplicar_decoradores: bool = True) -> Dict[str, Any]:
         """
         Busca registros de bitácora por mes.
         
         Args:
             mes: Número del mes (1-12)
             id_usuario: ID del usuario (opcional, para filtros secundarios)
-            paciente: Nombre del paciente (opcional, prioridad alta en filtros)
+            id_paciente: ID del paciente (opcional, prioridad alta en filtros)
             aplicar_decoradores: Si se deben aplicar los decoradores configurados
         
         Returns:
@@ -581,8 +586,8 @@ class BitacoraFacade:
         params = {'mes': mes}
         if id_usuario is not None:
             params['id_usuario'] = id_usuario
-        if paciente:
-            params['paciente'] = paciente
+        if id_paciente:
+            params['id_paciente'] = id_paciente
         search_strategy = BitacoraSearchFactory.create_search_strategy(params)
         
         con = None
@@ -613,14 +618,14 @@ class BitacoraFacade:
                 con.close()
     
     def obtener_registro(self, id_bitacora: int, id_usuario: Optional[int] = None,
-                         paciente: Optional[str] = None) -> Dict[str, Any]:
+                         id_paciente: Optional[int] = None) -> Dict[str, Any]:
         """
         Obtiene un registro de bitácora por su ID.
         
         Args:
             id_bitacora: ID del registro a obtener
             id_usuario: ID del usuario (opcional, para filtrar por usuario)
-            paciente: Nombre del paciente (opcional, para filtrar por paciente)
+            id_paciente: ID del paciente (opcional, para filtrar por paciente)
         
         Returns:
             Diccionario con el registro o error
@@ -630,14 +635,29 @@ class BitacoraFacade:
             con = self.connection_singleton.get_connection()
             cursor = con.cursor(dictionary=True)
             
-            if paciente:
-                sql = "SELECT * FROM bitacora WHERE idBitacora = %s AND paciente = %s"
-                val = (id_bitacora, paciente)
+            if id_paciente:
+                sql = """
+                SELECT b.*, p.nombreCompleto as paciente
+                FROM bitacora b
+                LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                WHERE b.idBitacora = %s AND b.idPaciente = %s
+                """
+                val = (id_bitacora, id_paciente)
             elif id_usuario is not None:
-                sql = "SELECT * FROM bitacora WHERE idBitacora = %s AND idUsuario = %s"
+                sql = """
+                SELECT b.*, p.nombreCompleto as paciente
+                FROM bitacora b
+                LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                WHERE b.idBitacora = %s AND p.idUsuario = %s
+                """
                 val = (id_bitacora, id_usuario)
             else:
-                sql = "SELECT * FROM bitacora WHERE idBitacora = %s"
+                sql = """
+                SELECT b.*, p.nombreCompleto as paciente
+                FROM bitacora b
+                LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                WHERE b.idBitacora = %s
+                """
                 val = (id_bitacora,)
             
             cursor.execute(sql, val)
@@ -690,12 +710,33 @@ class BitacoraFacade:
             if id_usuario:
                 datos['idUsuario'] = id_usuario
             
+            # Convertir nombre de paciente a idPaciente si se proporciona
+            id_paciente = datos.get('idPaciente')
+            nombre_paciente = datos.get('paciente')
+            if nombre_paciente and not id_paciente:
+                cursor_paciente = con.cursor(dictionary=True)
+                cursor_paciente.execute("SELECT idPaciente FROM pacientes WHERE nombreCompleto = %s", (nombre_paciente,))
+                paciente_data = cursor_paciente.fetchone()
+                cursor_paciente.close()
+                if paciente_data:
+                    id_paciente = paciente_data['idPaciente']
+                else:
+                    return {
+                        'success': False,
+                        'error': 'Paciente no encontrado en la base de datos'
+                    }
+            
             if id_bitacora:
                 # Actualizar registro existente
                 # Verificar que el registro pertenezca al usuario si se proporciona id_usuario
                 if not es_admin:
                     cursor_check = con.cursor(dictionary=True)
-                    cursor_check.execute("SELECT idUsuario, paciente FROM bitacora WHERE idBitacora = %s", (id_bitacora,))
+                    cursor_check.execute("""
+                        SELECT b.idPaciente, p.idUsuario 
+                        FROM bitacora b
+                        LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                        WHERE b.idBitacora = %s
+                    """, (id_bitacora,))
                     registro_existente = cursor_check.fetchone()
                     cursor_check.close()
                     
@@ -711,17 +752,23 @@ class BitacoraFacade:
                             'error': 'No tienes permiso para modificar este registro'
                         }
                     
-                    if paciente_contexto and registro_existente.get('paciente') != paciente_contexto:
-                        return {
-                            'success': False,
-                            'error': 'No tienes permiso para modificar este registro'
-                        }
+                    if paciente_contexto:
+                        # Obtener idPaciente del contexto
+                        cursor_paciente_ctx = con.cursor(dictionary=True)
+                        cursor_paciente_ctx.execute("SELECT idPaciente FROM pacientes WHERE nombreCompleto = %s", (paciente_contexto,))
+                        paciente_ctx_data = cursor_paciente_ctx.fetchone()
+                        cursor_paciente_ctx.close()
+                        if paciente_ctx_data and registro_existente.get('idPaciente') != paciente_ctx_data['idPaciente']:
+                            return {
+                                'success': False,
+                                'error': 'No tienes permiso para modificar este registro'
+                            }
                 
                 sql = """
                 UPDATE bitacora 
                 SET fecha = %s, horaInicio = %s, horaFin = %s, drenajeInicial = %s, 
                     ufTotal = %s, tiempoMedioPerm = %s, liquidoIngerido = %s, 
-                    cantidadOrina = %s, glucosa = %s, presionArterial = %s, paciente = %s
+                    cantidadOrina = %s, glucosa = %s, presionArterial = %s, idPaciente = %s
                 WHERE idBitacora = %s
                 """
                 val = (
@@ -735,51 +782,35 @@ class BitacoraFacade:
                     datos.get('cantidadOrina'),
                     datos.get('glucosa'),
                     datos.get('presionArterial'),
-                    datos.get('paciente'),
+                    id_paciente,
                     id_bitacora
                 )
             else:
                 # Insertar nuevo registro
-                id_usuario = datos.get('idUsuario')
-                if id_usuario:
-                    sql = """
-                    INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
-                                         tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial, paciente, idUsuario)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """
-                    val = (
-                        datos.get('fecha'),
-                        datos.get('horaInicio'),
-                        datos.get('horaFin'),
-                        datos.get('drenajeInicial'),
-                        datos.get('ufTotal'),
-                        datos.get('tiempoMedioPerm'),
-                        datos.get('liquidoIngerido'),
-                        datos.get('cantidadOrina'),
-                        datos.get('glucosa'),
-                        datos.get('presionArterial'),
-                        datos.get('paciente'),
-                        id_usuario
-                    )
-                else:
-                    sql = """
-                    INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
-                                         tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial, paciente)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """
-                    val = (
-                        datos.get('fecha'),
-                        datos.get('horaInicio'),
-                        datos.get('horaFin'),
-                        datos.get('drenajeInicial'),
-                        datos.get('ufTotal'),
-                        datos.get('tiempoMedioPerm'),
-                        datos.get('liquidoIngerido'),
-                        datos.get('cantidadOrina'),
-                        datos.get('glucosa'),
-                        datos.get('presionArterial'),
-                        datos.get('paciente')
-                    )
+                if not id_paciente:
+                    return {
+                        'success': False,
+                        'error': 'idPaciente es requerido para crear un registro'
+                    }
+                
+                sql = """
+                INSERT INTO bitacora (fecha, horaInicio, horaFin, drenajeInicial, ufTotal, 
+                                     tiempoMedioPerm, liquidoIngerido, cantidadOrina, glucosa, presionArterial, idPaciente)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                val = (
+                    datos.get('fecha'),
+                    datos.get('horaInicio'),
+                    datos.get('horaFin'),
+                    datos.get('drenajeInicial'),
+                    datos.get('ufTotal'),
+                    datos.get('tiempoMedioPerm'),
+                    datos.get('liquidoIngerido'),
+                    datos.get('cantidadOrina'),
+                    datos.get('glucosa'),
+                    datos.get('presionArterial'),
+                    id_paciente
+                )
             
             cursor.execute(sql, val)
             con.commit()
@@ -839,7 +870,12 @@ class BitacoraFacade:
             # Si se proporciona id_usuario, verificar que el registro pertenezca al usuario
             if not es_admin and (id_usuario or paciente_contexto):
                 cursor_check = con.cursor(dictionary=True)
-                cursor_check.execute("SELECT idUsuario, paciente FROM bitacora WHERE idBitacora = %s", (id_bitacora,))
+                cursor_check.execute("""
+                    SELECT b.idPaciente, p.idUsuario 
+                    FROM bitacora b
+                    LEFT JOIN pacientes p ON b.idPaciente = p.idPaciente
+                    WHERE b.idBitacora = %s
+                """, (id_bitacora,))
                 registro_existente = cursor_check.fetchone()
                 cursor_check.close()
                 
@@ -855,21 +891,20 @@ class BitacoraFacade:
                         'error': 'No tienes permiso para eliminar este registro'
                     }
                 
-                if paciente_contexto and registro_existente.get('paciente') != paciente_contexto:
-                    return {
-                        'success': False,
-                        'error': 'No tienes permiso para eliminar este registro'
-                    }
-                
-                if id_usuario:
-                    sql = "DELETE FROM bitacora WHERE idBitacora = %s AND idUsuario = %s"
-                    val = (id_bitacora, id_usuario)
-                else:
-                    sql = "DELETE FROM bitacora WHERE idBitacora = %s AND paciente = %s"
-                    val = (id_bitacora, paciente_contexto)
-            else:
-                sql = "DELETE FROM bitacora WHERE idBitacora = %s"
-                val = (id_bitacora,)
+                if paciente_contexto:
+                    # Obtener idPaciente del contexto
+                    cursor_paciente_ctx = con.cursor(dictionary=True)
+                    cursor_paciente_ctx.execute("SELECT idPaciente FROM pacientes WHERE nombreCompleto = %s", (paciente_contexto,))
+                    paciente_ctx_data = cursor_paciente_ctx.fetchone()
+                    cursor_paciente_ctx.close()
+                    if paciente_ctx_data and registro_existente.get('idPaciente') != paciente_ctx_data['idPaciente']:
+                        return {
+                            'success': False,
+                            'error': 'No tienes permiso para eliminar este registro'
+                        }
+            
+            sql = "DELETE FROM bitacora WHERE idBitacora = %s"
+            val = (id_bitacora,)
             
             cursor.execute(sql, val)
             con.commit()

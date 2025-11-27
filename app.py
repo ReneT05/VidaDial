@@ -101,7 +101,8 @@ def admin_required(fun):
                 "estado": "error",
                 "respuesta": "No has iniciado sesión"
             }), 401
-        if session.get("login-tipo") != 1:
+        # Comparar como string porque en la BD es VARCHAR
+        if str(session.get("login-tipo")) != "1":
             return jsonify({
                 "estado": "error",
                 "respuesta": "No tienes permisos de administrador"
@@ -115,9 +116,72 @@ def obtener_contexto_usuario():
     """
     tipo_usuario = session.get("login-tipo", 0)
     id_usuario = session.get("login-id")
-    es_admin = (tipo_usuario == 1)
+    # Convertir a string para comparación porque en la BD es VARCHAR
+    es_admin = (str(tipo_usuario) == "1")
     paciente = session.get("login-usr")
     return tipo_usuario, id_usuario, es_admin, paciente
+
+def obtener_id_paciente_por_nombre(nombre_paciente: str):
+    """
+    Obtiene el idPaciente desde el nombre del paciente.
+    Retorna el idPaciente o None si no se encuentra.
+    """
+    if not nombre_paciente:
+        return None
+    
+    con = None
+    cursor = None
+    try:
+        con = con_pool.get_connection()
+        cursor = con.cursor(dictionary=True)
+        sql = """
+        SELECT idPaciente
+        FROM pacientes
+        WHERE nombreCompleto = %s
+        LIMIT 1
+        """
+        cursor.execute(sql, (nombre_paciente,))
+        resultado = cursor.fetchone()
+        return resultado['idPaciente'] if resultado else None
+    except mysql.connector.Error as error:
+        print(f"[app.py] Error al obtener idPaciente: {error}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if con and con.is_connected():
+            con.close()
+
+def obtener_nombre_paciente_por_id(id_paciente: int):
+    """
+    Obtiene el nombre del paciente desde su idPaciente.
+    Retorna el nombre o None si no se encuentra.
+    """
+    if not id_paciente:
+        return None
+    
+    con = None
+    cursor = None
+    try:
+        con = con_pool.get_connection()
+        cursor = con.cursor(dictionary=True)
+        sql = """
+        SELECT nombreCompleto
+        FROM pacientes
+        WHERE idPaciente = %s
+        LIMIT 1
+        """
+        cursor.execute(sql, (id_paciente,))
+        resultado = cursor.fetchone()
+        return resultado['nombreCompleto'] if resultado else None
+    except mysql.connector.Error as error:
+        print(f"[app.py] Error al obtener nombre de paciente: {error}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if con and con.is_connected():
+            con.close()
 
 @app.route("/")
 def dashboard():
@@ -394,18 +458,22 @@ def buscarBitacora():
     # Definir contexto de usuario para aplicar reglas por rol
     tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
 
+    # Convertir nombre de paciente a idPaciente
+    id_paciente_filtro = None
     if es_admin:
-        filtro_paciente = paciente_param or None
+        if paciente_param:
+            id_paciente_filtro = obtener_id_paciente_por_nombre(paciente_param)
         filtro_usuario = None
     else:
-        filtro_paciente = paciente_sesion
+        if paciente_sesion:
+            id_paciente_filtro = obtener_id_paciente_por_nombre(paciente_sesion)
         filtro_usuario = id_usuario
 
     # Usar el Facade para buscar (simplifica todo el proceso)
     resultado = bitacora_facade.buscar_por_mes(
         mes_int,
         id_usuario=filtro_usuario,
-        paciente=filtro_paciente,
+        id_paciente=id_paciente_filtro,
         aplicar_decoradores=True
     )
 
@@ -419,11 +487,13 @@ def obtenerBitacora(id):
     """Obtiene un registro de bitácora por su ID."""
     tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
     filtro_usuario = None if es_admin else id_usuario
-    filtro_paciente = None if es_admin else paciente_sesion
+    id_paciente_filtro = None
+    if not es_admin and paciente_sesion:
+        id_paciente_filtro = obtener_id_paciente_por_nombre(paciente_sesion)
     resultado = bitacora_facade.obtener_registro(
         id,
         id_usuario=filtro_usuario,
-        paciente=filtro_paciente
+        id_paciente=id_paciente_filtro
     )
     
     if resultado.get('success'):
@@ -440,11 +510,16 @@ def guardarBitacora():
     # Obtener contexto de usuario
     tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
     
-    paciente = request.form.get("paciente", "").strip()
+    nombre_paciente = request.form.get("paciente", "").strip()
     if not es_admin:
-        paciente = paciente_sesion or paciente
-    if not paciente:
+        nombre_paciente = paciente_sesion or nombre_paciente
+    if not nombre_paciente:
         return make_response(jsonify({"error": "El campo paciente es obligatorio"}), 400)
+    
+    # Convertir nombre de paciente a idPaciente
+    id_paciente = obtener_id_paciente_por_nombre(nombre_paciente)
+    if not id_paciente:
+        return make_response(jsonify({"error": "Paciente no encontrado en la base de datos"}), 400)
     
     datos = {
         "fecha": request.form.get("fecha", "").strip(),
@@ -457,7 +532,8 @@ def guardarBitacora():
         "cantidadOrina": None,
         "glucosa": None,
         "presionArterial": request.form.get("presionArterial", "").strip() or None,
-        "paciente": paciente
+        "paciente": nombre_paciente,  # Mantener para compatibilidad
+        "idPaciente": id_paciente     # Agregar idPaciente para la BD
     }
 
     # Agregar ID si existe (para actualización)

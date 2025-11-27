@@ -114,7 +114,8 @@ class UsuarioDAO:
             INSERT INTO usuario (nombre, contrasena, tipo_usuario)
             VALUES (%s, %s, %s)
             """
-            cursor.execute(sql, (nombre, contrasena, tipo_usuario))
+            # Convertir tipo_usuario a string porque en la BD es VARCHAR
+            cursor.execute(sql, (nombre, contrasena, str(tipo_usuario)))
             con.commit()
             return cursor.lastrowid
         except mysql.connector.Error as error:
@@ -154,7 +155,8 @@ class UsuarioDAO:
             
             if tipo_usuario is not None:
                 campos.append("tipo_usuario = %s")
-                valores.append(tipo_usuario)
+                # Convertir tipo_usuario a string porque en la BD es VARCHAR
+                valores.append(str(tipo_usuario))
             
             if not campos:
                 return False
