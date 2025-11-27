@@ -125,8 +125,53 @@ def obtener_id_paciente_por_nombre(nombre_paciente: str):
     """
     Obtiene el idPaciente desde el nombre del paciente.
     Retorna el idPaciente o None si no se encuentra.
+    Busca de forma case-insensitive y permite coincidencias parciales.
     """
     if not nombre_paciente:
+        return None
+    
+    con = None
+    cursor = None
+    try:
+        con = con_pool.get_connection()
+        cursor = con.cursor(dictionary=True)
+        # Buscar primero por coincidencia exacta (case-insensitive)
+        sql = """
+        SELECT idPaciente
+        FROM pacientes
+        WHERE LOWER(TRIM(nombreCompleto)) = LOWER(TRIM(%s))
+        LIMIT 1
+        """
+        cursor.execute(sql, (nombre_paciente,))
+        resultado = cursor.fetchone()
+        if resultado:
+            return resultado['idPaciente']
+        
+        # Si no encuentra, buscar por coincidencia parcial (case-insensitive)
+        sql = """
+        SELECT idPaciente
+        FROM pacientes
+        WHERE LOWER(nombreCompleto) LIKE LOWER(%s)
+        LIMIT 1
+        """
+        cursor.execute(sql, (f"%{nombre_paciente}%",))
+        resultado = cursor.fetchone()
+        return resultado['idPaciente'] if resultado else None
+    except mysql.connector.Error as error:
+        print(f"[app.py] Error al obtener idPaciente: {error}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if con and con.is_connected():
+            con.close()
+
+def obtener_id_paciente_por_id_usuario(id_usuario: int):
+    """
+    Obtiene el idPaciente asociado a un idUsuario.
+    Retorna el idPaciente o None si no se encuentra.
+    """
+    if not id_usuario:
         return None
     
     con = None
@@ -137,14 +182,14 @@ def obtener_id_paciente_por_nombre(nombre_paciente: str):
         sql = """
         SELECT idPaciente
         FROM pacientes
-        WHERE nombreCompleto = %s
+        WHERE idUsuario = %s
         LIMIT 1
         """
-        cursor.execute(sql, (nombre_paciente,))
+        cursor.execute(sql, (id_usuario,))
         resultado = cursor.fetchone()
         return resultado['idPaciente'] if resultado else None
     except mysql.connector.Error as error:
-        print(f"[app.py] Error al obtener idPaciente: {error}")
+        print(f"[app.py] Error al obtener idPaciente por idUsuario: {error}")
         return None
     finally:
         if cursor:
@@ -465,8 +510,8 @@ def buscarBitacora():
             id_paciente_filtro = obtener_id_paciente_por_nombre(paciente_param)
         filtro_usuario = None
     else:
-        if paciente_sesion:
-            id_paciente_filtro = obtener_id_paciente_por_nombre(paciente_sesion)
+        # Si no es admin, obtener el idPaciente desde la relación con el usuario
+        id_paciente_filtro = obtener_id_paciente_por_id_usuario(id_usuario)
         filtro_usuario = id_usuario
 
     # Usar el Facade para buscar (simplifica todo el proceso)
@@ -488,8 +533,9 @@ def obtenerBitacora(id):
     tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
     filtro_usuario = None if es_admin else id_usuario
     id_paciente_filtro = None
-    if not es_admin and paciente_sesion:
-        id_paciente_filtro = obtener_id_paciente_por_nombre(paciente_sesion)
+    if not es_admin:
+        # Si no es admin, obtener el idPaciente desde la relación con el usuario
+        id_paciente_filtro = obtener_id_paciente_por_id_usuario(id_usuario)
     resultado = bitacora_facade.obtener_registro(
         id,
         id_usuario=filtro_usuario,
@@ -511,15 +557,28 @@ def guardarBitacora():
     tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
     
     nombre_paciente = request.form.get("paciente", "").strip()
+    id_paciente = None
+    
     if not es_admin:
-        nombre_paciente = paciente_sesion or nombre_paciente
+        # Si no es admin, obtener el idPaciente desde la relación con el usuario
+        id_paciente = obtener_id_paciente_por_id_usuario(id_usuario)
+        if id_paciente:
+            # Obtener el nombre completo del paciente para mantener consistencia
+            nombre_paciente = obtener_nombre_paciente_por_id(id_paciente) or nombre_paciente
+        else:
+            # Si no hay paciente asociado al usuario, intentar buscar por nombre
+            if nombre_paciente:
+                id_paciente = obtener_id_paciente_por_nombre(nombre_paciente)
+    else:
+        # Si es admin, buscar por el nombre proporcionado
+        if nombre_paciente:
+            id_paciente = obtener_id_paciente_por_nombre(nombre_paciente)
+    
+    if not id_paciente:
+        return make_response(jsonify({"error": "Paciente no encontrado en la base de datos. Verifique que el nombre del paciente sea correcto."}), 400)
+    
     if not nombre_paciente:
         return make_response(jsonify({"error": "El campo paciente es obligatorio"}), 400)
-    
-    # Convertir nombre de paciente a idPaciente
-    id_paciente = obtener_id_paciente_por_nombre(nombre_paciente)
-    if not id_paciente:
-        return make_response(jsonify({"error": "Paciente no encontrado en la base de datos"}), 400)
     
     datos = {
         "fecha": request.form.get("fecha", "").strip(),

@@ -710,13 +710,30 @@ class BitacoraFacade:
             if id_usuario:
                 datos['idUsuario'] = id_usuario
             
-            # Convertir nombre de paciente a idPaciente si se proporciona
+            # Obtener idPaciente desde los datos (ya viene convertido desde app.py)
             id_paciente = datos.get('idPaciente')
             nombre_paciente = datos.get('paciente')
+            
+            # Si no viene idPaciente pero sí nombre, intentar buscar (fallback)
             if nombre_paciente and not id_paciente:
                 cursor_paciente = con.cursor(dictionary=True)
-                cursor_paciente.execute("SELECT idPaciente FROM pacientes WHERE nombreCompleto = %s", (nombre_paciente,))
+                # Buscar por coincidencia exacta case-insensitive
+                cursor_paciente.execute("""
+                    SELECT idPaciente 
+                    FROM pacientes 
+                    WHERE LOWER(TRIM(nombreCompleto)) = LOWER(TRIM(%s))
+                    LIMIT 1
+                """, (nombre_paciente,))
                 paciente_data = cursor_paciente.fetchone()
+                if not paciente_data:
+                    # Si no encuentra, buscar por coincidencia parcial
+                    cursor_paciente.execute("""
+                        SELECT idPaciente 
+                        FROM pacientes 
+                        WHERE LOWER(nombreCompleto) LIKE LOWER(%s)
+                        LIMIT 1
+                    """, (f"%{nombre_paciente}%",))
+                    paciente_data = cursor_paciente.fetchone()
                 cursor_paciente.close()
                 if paciente_data:
                     id_paciente = paciente_data['idPaciente']
