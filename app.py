@@ -93,11 +93,28 @@ def login(fun):
         return fun(*args, **kwargs)
     return decorador
 
+def admin_required(fun):
+    @wraps(fun)
+    def decorador(*args, **kwargs):
+        if not session.get("login"):
+            return jsonify({
+                "estado": "error",
+                "respuesta": "No has iniciado sesión"
+            }), 401
+        if session.get("login-tipo") != 1:
+            return jsonify({
+                "estado": "error",
+                "respuesta": "No tienes permisos de administrador"
+            }), 403
+        return fun(*args, **kwargs)
+    return decorador
+
 def obtener_contexto_usuario():
     """
     Retorna información de la sesión del usuario.
     """
-    tipo_usuario, id_usuario, es_admin, paciente_sesion = obtener_contexto_usuario()
+    tipo_usuario = session.get("login-tipo", 0)
+    id_usuario = session.get("login-id")
     es_admin = (tipo_usuario == 1)
     paciente = session.get("login-usr")
     return tipo_usuario, id_usuario, es_admin, paciente
@@ -502,3 +519,109 @@ def eliminarRegistro():
         return make_response(jsonify({"success": True}))
     else:
         return make_response(jsonify({"error": resultado.get('error', 'Error al eliminar')}), 400)
+
+# ============================================================================
+# RUTAS PARA GESTIÓN DE USUARIOS Y ADMINISTRADORES
+# ============================================================================
+
+@app.route("/usuarios", methods=["GET"])
+@admin_required
+def listarUsuarios():
+    """Lista todos los usuarios (solo administradores)."""
+    try:
+        usuarios = usuario_dao.listar_todos()
+        return make_response(jsonify(usuarios))
+    except Exception as error:
+        print(f"[app.py] Error al listar usuarios: {error}")
+        return make_response(jsonify({"error": "Error al listar usuarios"}), 500)
+
+@app.route("/usuario/<int:id>", methods=["GET"])
+@admin_required
+def obtenerUsuario(id):
+    """Obtiene un usuario por su ID (solo administradores)."""
+    try:
+        usuario = usuario_dao.obtener_por_id(id)
+        if usuario:
+            return make_response(jsonify(usuario))
+        else:
+            return make_response(jsonify({"error": "Usuario no encontrado"}), 404)
+    except Exception as error:
+        print(f"[app.py] Error al obtener usuario: {error}")
+        return make_response(jsonify({"error": "Error al obtener usuario"}), 500)
+
+@app.route("/usuario", methods=["POST"])
+@admin_required
+def guardarUsuario():
+    """Crea o actualiza un usuario (solo administradores)."""
+    try:
+        id_usuario = request.form.get("id", "").strip()
+        nombre = request.form.get("nombre", "").strip()
+        contrasena = request.form.get("contrasena", "").strip()
+        tipo_usuario = request.form.get("tipo_usuario", "").strip()
+        
+        if not nombre:
+            return make_response(jsonify({"error": "El nombre es obligatorio"}), 400)
+        
+        # Convertir tipo_usuario a entero
+        try:
+            tipo_usuario_int = int(tipo_usuario) if tipo_usuario else 2
+        except ValueError:
+            tipo_usuario_int = 2
+        
+        # Validar que tipo_usuario sea 1 (admin) o 2 (usuario)
+        if tipo_usuario_int not in [1, 2]:
+            tipo_usuario_int = 2
+        
+        if id_usuario and id_usuario.isdigit():
+            # Actualizar usuario existente
+            id_int = int(id_usuario)
+            # Si no se proporciona contraseña, no la actualizamos
+            if contrasena:
+                exito = usuario_dao.actualizar(id_int, nombre, contrasena, tipo_usuario_int)
+            else:
+                exito = usuario_dao.actualizar(id_int, nombre, None, tipo_usuario_int)
+            
+            if exito:
+                return make_response(jsonify({"success": True, "id": id_int}))
+            else:
+                return make_response(jsonify({"error": "Error al actualizar usuario"}), 400)
+        else:
+            # Crear nuevo usuario
+            if not contrasena:
+                return make_response(jsonify({"error": "La contraseña es obligatoria para nuevos usuarios"}), 400)
+            
+            nuevo_id = usuario_dao.crear(nombre, contrasena, tipo_usuario_int)
+            if nuevo_id:
+                return make_response(jsonify({"success": True, "id": nuevo_id}))
+            else:
+                return make_response(jsonify({"error": "Error al crear usuario"}), 400)
+    except Exception as error:
+        print(f"[app.py] Error al guardar usuario: {error}")
+        return make_response(jsonify({"error": "Error al guardar usuario"}), 500)
+
+@app.route("/usuario/eliminar", methods=["POST"])
+@admin_required
+def eliminarUsuario():
+    """Elimina un usuario (solo administradores)."""
+    try:
+        id_usuario = request.form.get("id")
+        if not id_usuario:
+            return make_response(jsonify({"error": "ID no proporcionado"}), 400)
+        
+        try:
+            id_int = int(id_usuario)
+        except ValueError:
+            return make_response(jsonify({"error": "ID inválido"}), 400)
+        
+        # No permitir que un administrador se elimine a sí mismo
+        if id_int == session.get("login-id"):
+            return make_response(jsonify({"error": "No puedes eliminar tu propio usuario"}), 400)
+        
+        exito = usuario_dao.eliminar(id_int)
+        if exito:
+            return make_response(jsonify({"success": True}))
+        else:
+            return make_response(jsonify({"error": "Error al eliminar usuario o usuario no encontrado"}), 400)
+    except Exception as error:
+        print(f"[app.py] Error al eliminar usuario: {error}")
+        return make_response(jsonify({"error": "Error al eliminar usuario"}), 500)
